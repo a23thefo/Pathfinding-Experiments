@@ -1,0 +1,9 @@
+#pathfindingCanvas {
+    margin:auto;
+    display:block;
+}
+.header {
+    text-align: center;
+    font-family: Arial, sans-serif;
+    margin-bottom: 1em;
+}
