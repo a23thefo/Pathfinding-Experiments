@@ -4,8 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pathfinding</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Hello World!</h1>
+    <header class="header">
+        <h1>The Pathfinder</h1>
+        <div><input type="radio" name="algorithm" value="a-star" checked>A*<input type="radio" name="algorithm" value="llmastar">LLM-A*</div>
+    </header>
+    <canvas id="pathfindingCanvas" width="800" height="600" style="border:1px solid #000000;"></canvas>
+    <script src="pathfinding.js"></script>
 </body>
 </html>
