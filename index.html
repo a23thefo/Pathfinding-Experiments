@@ -1,17 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pathfinding</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <header class="header">
-        <h1>The Pathfinder</h1>
-        <div><input type="radio" name="algorithm" value="a-star" checked>A*<input type="radio" name="algorithm" value="llmastar">LLM-A*</div>
-    </header>
-    <canvas id="pathfindingCanvas" width="800" height="600" style="border:1px solid #000000;"></canvas>
-    <script src="pathfinding.js"></script>
-</body>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Pathfinding</title>
+        <link rel="stylesheet" href="style.css">
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="crossorigin=""/>
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="crossorigin=""></script>
+    </head>
+    <body>
+        <div id="map" style="height: 720px;"></div>
+        <header class="header">
+            <h1>The Pathfinder</h1>
+            <div><input type="radio" name="algorithm" value="a-star" checked>A*<input type="radio" name="algorithm" value="llmastar">LLM-A*</div>
+        </header>
+        <canvas id="pathfindingCanvas" width="800" height="600" style="border:1px solid #000000;"></canvas>
+        <p>Hello</p>
+        <script src="pathfinding.js"></script>
+        <script>
+            var map = L.map('map').setView([51.505, -0.09], 13);
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            }).addTo(map);
+        </script>
+    </body>
 </html>
