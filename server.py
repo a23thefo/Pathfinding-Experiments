@@ -54,7 +54,7 @@ class RoutingGraphHandler(osmium.SimpleHandler):
 print("Parsing OSM data and building graph... (This takes a moment)")
 handler = RoutingGraphHandler()
 # locations=True tells osmium to cache node coordinates so ways can access them
-handler.apply_file("sweden.osm.pbf", locations=True)
+handler.apply_file("ireland-and-northern-ireland.osm.pbf", locations=True)
 graph = handler.graph
 
 print(f"Graph ready! Nodes: {len(graph.nodes)}, Edges: {len(graph.edges)}")
