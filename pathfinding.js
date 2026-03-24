@@ -24,11 +24,17 @@ function initializeMap() {
         let response = await fetch(`http://127.0.0.1:8000/route?start_lat=${start.lat}&start_lon=${start.lng}&end_lat=${end.lat}&end_lon=${end.lng}`);
         let geojsonData = await response.json();
 
-        // 5. Draw the Route on Leaflet
-        if (routeLayer) map.removeLayer(routeLayer); // Clear old route
-        routeLayer = L.geoJSON(geojsonData, { style: { color: 'blue', weight: 5 } }).addTo(map);
-        
-        clicks = []; // Reset for next route
+        if (geojsonData.type === "error") {
+            alert(geojsonData.message);
+            clicks = [];
+            return;
+        } else{
+            // 5. Draw the Route on Leaflet
+            if (routeLayer) map.removeLayer(routeLayer); // Clear old route
+            routeLayer = L.geoJSON(geojsonData, { style: { color: 'blue', weight: 5 } }).addTo(map);
+            
+            clicks = []; // Reset for next route
+        }
     }
     });
 }

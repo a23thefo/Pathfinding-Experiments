@@ -9,13 +9,13 @@ app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"])
 
 # --- HELPER: CALCULATE REAL-WORLD DISTANCE ---
-def calculate_distance(lat1, lon1, lat2, lon2):
-    """Calculates the distance in meters between two coordinates using the Haversine formula."""
-    R = 6371000 # Earth radius in meters
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    dphi, dlambda = math.radians(lat2 - lat1), math.radians(lon2 - lon1)
-    a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlambda/2)**2
-    return R * (2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)))
+def calculate_distance(y1, x1, y2, x2): # Latitude = y | Longitude = x
+    # Calculates the distance in meters between two coordinates using the Haversine formula
+    Equator = 6371000 # Earth radius in meters
+    radiantsY1, radiantsY2 = math.radians(y1), math.radians(y2)
+    distanceLatitude, distanceLongitude = math.radians(y2 - y1), math.radians(x2 - x1)
+    a = math.sin(distanceLatitude/2)**2 + math.cos(radiantsY1)*math.cos(radiantsY2)*math.sin(distanceLongitude/2)**2
+    return Equator * (2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)))
 
 # --- 1. THE OSMIUM HANDLER ---
 class RoutingGraphHandler(osmium.SimpleHandler):
@@ -33,20 +33,20 @@ class RoutingGraphHandler(osmium.SimpleHandler):
             # A 'way' is made of multiple nodes. We connect them as edges in our graph.
             nodes = w.nodes
             for i in range(len(nodes) - 1):
-                n1, n2 = nodes[i], nodes[i+1]
+                node1, node2 = nodes[i], nodes[i+1]
                 
                 try:
                     # Grab coordinates (requires locations=True when applying the handler)
-                    lat1, lon1 = n1.location.lat, n1.location.lon
-                    lat2, lon2 = n2.location.lat, n2.location.lon
+                    y1, x1 = node1.location.lat, node1.location.lon
+                    y2, x2 = node2.location.lat, node2.location.lon
                     
                     # Add nodes to graph with their coordinates
-                    self.graph.add_node(n1.ref, lat=lat1, lon=lon1)
-                    self.graph.add_node(n2.ref, lat=lat2, lon=lon2)
+                    self.graph.add_node(node1.ref, lat=y1, lon=x1)
+                    self.graph.add_node(node2.ref, lat=y2, lon=x2)
                     
                     # Calculate physical distance to use as the "weight" (cost) of the road
-                    dist = calculate_distance(lat1, lon1, lat2, lon2)
-                    self.graph.add_edge(n1.ref, n2.ref, weight=dist)
+                    dist = calculate_distance(y1, x1, y2, x2)
+                    self.graph.add_edge(node1.ref, node2.ref, weight=dist)
                 except osmium.InvalidLocationError:
                     continue # Skip if node location is missing
 
@@ -93,4 +93,4 @@ def calculate_route(start_lat: float, start_lon: float, end_lat: float, end_lon:
             }
         }
     except nx.NetworkXNoPath:
-        return {"error": "No path could be found between those points."}
+        return {"type": "error", "message": "No route found between the selected points."}
