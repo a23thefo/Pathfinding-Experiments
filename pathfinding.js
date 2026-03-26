@@ -9,33 +9,54 @@ function initializeMap() {
     }).addTo(map);
 
     let clicks = [];
-    let routeLayer = null;
+    let drawnLayers = []; // Keep track of everything we draw so we can clear it
 
-    // 3. Listen for clicks to set Start and End points
+    // A helper function to pause JavaScript (creates the animation effect)
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
     map.on('click', async function(e) {
-    clicks.push(e.latlng);
-    L.marker(e.latlng).addTo(map);
+        clicks.push(e.latlng);
+        let marker = L.marker(e.latlng).addTo(map);
+        drawnLayers.push(marker);
 
-    if (clicks.length === 2) {
-        let start = clicks[0];
-        let end = clicks[1];
+        if (clicks.length === 2) {
+            let start = clicks[0];
+            let end = clicks[1];
 
-        // 4. Ask your Python Backend for the Route
-        let response = await fetch(`http://127.0.0.1:8000/route?start_lat=${start.lat}&start_lon=${start.lng}&end_lat=${end.lat}&end_lon=${end.lng}`);
-        let geojsonData = await response.json();
+            // Fetch the data from your new endpoint
+            let response = await fetch(`http://localhost:8000/route?start_lat=${start.lat}&start_lon=${start.lng}&end_lat=${end.lat}&end_lon=${end.lng}`);
+            let data = await response.json();
 
-        if (geojsonData.type === "error") {
-            alert(geojsonData.message);
-            clicks = [];
-            return;
-        } else{
-            // 5. Draw the Route on Leaflet
-            if (routeLayer) map.removeLayer(routeLayer); // Clear old route
-            routeLayer = L.geoJSON(geojsonData, { style: { color: 'blue', weight: 5 } }).addTo(map);
+            // 1. ANIMATE THE SEARCH HISTORY
+            // We draw the roads the algorithm checked in a light red color
+            for (let i = 0; i < data.search_history.length; i++) {
+                let roadCoords = data.search_history[i];
+                console.log("Drawing search step:", roadCoords);
+                let searchLine = L.polyline(roadCoords, {
+                    color: '#ff7800', 
+                    weight: 2, 
+                    opacity: 0.5
+                }).addTo(map);
+                
+                drawnLayers.push(searchLine);
+
+                // Pause for 5 milliseconds before drawing the next road.
+                // (Decrease this number if the animation is too slow!)
+                await sleep(5); 
+            }
+
+            // 2. DRAW THE FINAL ROUTE
+            // Once the animation is done, draw the winning path in thick blue
+            console.log("Drawing final route:", data.final_route);
+            let finalRouteLayer = L.geoJSON(data.final_route, { 
+                style: { color: 'blue', weight: 6, opacity: 1 } 
+            }).addTo(map);
             
-            clicks = []; // Reset for next route
+            drawnLayers.push(finalRouteLayer);
+            
+            // Reset clicks for the next attempt
+            clicks = []; 
         }
-    }
     });
 }
 
