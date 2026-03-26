@@ -13,15 +13,23 @@ def dijkstra(graph, startNode, goalNode):
     searching = True
     unsearched = getNeighbors(graph, startNode)
     searched = []
-    print(heapq.heappop(unsearched))
     while searching:
-        searching = False
+        currentNode = heapq.heappop(unsearched)
+        if currentNode[2] == goalNode:
+            searching = False
+            print("Found the goal node!")
+            return currentNode
+        else:
+            searched.append(currentNode[1])
+            for n in getNeighbors(graph, currentNode[2], currentNode[0]):
+                if n[2] not in searched:
+                    heapq.heappush(unsearched,n)
         
-def getNeighbors(graph, parent):
+def getNeighbors(graph, parent, currentCost=0):
     neighbors = []
     for n in graph.neighbors(parent):
         weight = graph[parent][n]["weight"]
-        heapq.heappush(neighbors,(weight,parent,n))
+        heapq.heappush(neighbors,(weight+currentCost,parent,n))
     return neighbors
 
 # --- HELPER: CALCULATE REAL-WORLD DISTANCE ---
