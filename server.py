@@ -62,7 +62,9 @@ print(f"Graph ready! Nodes: {len(graph.nodes)}, Edges: {len(graph.edges)}")
 # Build a KD-Tree so we can quickly snap map clicks to the nearest valid road node
 node_ids = list(graph.nodes)
 # Scipy KDTree expects a list of [latitude, longitude] pairs
-coordinates = [[graph.nodes[n]['lat'], graph.nodes[n]['lon']] for n in node_ids]
+coordinates = []
+for n in node_ids:
+    coordinates.append([graph.nodes[n]['lat'], graph.nodes[n]['lon']])
 kdtree = KDTree(coordinates)
 print("Spatial index (KD-Tree) ready!")
 
@@ -83,8 +85,10 @@ def calculate_route(start_lat: float, start_lon: float, end_lat: float, end_lon:
         
         # 3. Convert the list of node IDs back into Lat/Lon coordinates for GeoJSON
         # Note: GeoJSON strictly expects format [longitude, latitude]
-        route_coords = [[graph.nodes[n]['lon'], graph.nodes[n]['lat']] for n in path_node_ids]
-
+        route_coords = []
+        for n in path_node_ids:
+            route_coords.append([graph.nodes[n]['lon'], graph.nodes[n]['lat']])
+        print(route_coords)
         return {
             "type": "Feature",
             "geometry": {
