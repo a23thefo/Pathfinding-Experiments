@@ -3,10 +3,26 @@ from fastapi.middleware.cors import CORSMiddleware
 import osmium
 import networkx as nx
 import math
+import heapq
 from scipy.spatial import KDTree
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"])
+
+def dijkstra(graph, startNode, goalNode):
+    searching = True
+    unsearched = getNeighbors(graph, startNode)
+    searched = []
+    print(heapq.heappop(unsearched))
+    while searching:
+        searching = False
+        
+def getNeighbors(graph, parent):
+    neighbors = []
+    for n in graph.neighbors(parent):
+        weight = graph[parent][n]["weight"]
+        heapq.heappush(neighbors,(weight,parent,n))
+    return neighbors
 
 # --- HELPER: CALCULATE REAL-WORLD DISTANCE ---
 def calculate_distance(y1, x1, y2, x2): # Latitude = y | Longitude = x
@@ -67,8 +83,7 @@ for n in node_ids:
     coordinates.append([graph.nodes[n]['lat'], graph.nodes[n]['lon']])
 kdtree = KDTree(coordinates)
 print("Spatial index (KD-Tree) ready!")
-
-
+dijkstra(graph,list(graph.nodes)[0],list(graph.nodes)[1])
 # --- 3. THE ROUTING ENDPOINT ---
 @app.get("/route")
 def calculate_route(start_lat: float, start_lon: float, end_lat: float, end_lon: float):
@@ -98,3 +113,4 @@ def calculate_route(start_lat: float, start_lon: float, end_lat: float, end_lon:
         }
     except nx.NetworkXNoPath:
         return {"type": "error", "message": "No route found between the selected points."}
+
