@@ -3,10 +3,81 @@ from fastapi.middleware.cors import CORSMiddleware
 import osmium
 import networkx as nx
 import math
+import heapq
 from scipy.spatial import KDTree
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"])
+
+def dijkstra(graph, startNode, goalNode):
+    searching = True
+    unsearched = getNeighbors(graph, startNode)
+    searched = [{"weight":0,"parent":None,"node":startNode}]
+    searchHistory = []
+    path=[]
+    while searching:
+        if unsearched == []:
+            print("No path found")
+            return []
+        currentNode = heapq.heappop(unsearched)
+        if currentNode[2] == goalNode:
+            searching = False
+            currentNode = {"weight":currentNode[0],"parent":currentNode[1],"node":currentNode[2]}
+            print("Found the goal node!")
+            while currentNode["node"] != startNode:
+                path.append(currentNode["node"])
+                currentNode = [s for s in searched if s["node"] == currentNode["parent"]][0]
+            print("found path")
+            return path, searchHistory
+        else:
+            searched.append({"weight":currentNode[0],"parent":currentNode[1],"node":currentNode[2]})
+            print("Searching neighbors of node", currentNode[0])
+            for n in getNeighbors(graph, currentNode[2], currentNode[0]):
+                if n[2] not in [s["node"] for s in searched] or n[0] < [s["weight"] for s in searched if s["node"] == n[2]][0]:
+                    currentNode = heapq.heappush(unsearched,n)
+                    lat1, lon1 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
+                    lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
+                    searchHistory.append([[lat1, lon1], [lat2, lon2]])
+
+def aStar(graph, startNode, goalNode):
+    searching = True
+    unsearched = getNeighbors(graph, startNode)
+    searched = [{"weight":0,"parent":None,"node":startNode}]
+    searchHistory = []
+    path=[]
+    while searching:
+        if unsearched == []:
+            print("No path found")
+            return []
+        heapq.heapify(unsearched)
+        currentNode = heapq.heappop(unsearched)
+        if currentNode[2] == goalNode:
+            searching = False
+            currentNode = {"weight":currentNode[0],"parent":currentNode[1],"node":currentNode[2]}
+            print("Found the goal node!")
+            while currentNode["node"] != startNode:
+                path.append(currentNode["node"])
+                currentNode = [s for s in searched if s["node"] == currentNode["parent"]][0]
+            print("found path")
+            return path, searchHistory
+        else:
+            searched.append({"weight":currentNode[0],"parent":currentNode[1],"node":currentNode[2]})
+            print("Searching neighbors of node", currentNode[0])
+            for n in getNeighbors(graph, currentNode[2], currentNode[0], goalNode, "aStar"):
+                if n[2] not in [s["node"] for s in searched] or n[0] < [s["weight"] for s in searched if s["node"] == n[2]][0]:
+                    currentNode = heapq.heappush(unsearched,n)
+                    lat1, lon1 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
+                    lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
+                    searchHistory.append([[lat1, lon1], [lat2, lon2]])
+
+def getNeighbors(graph, parent, currentCost=0, goalNode=None, heuristic=None):
+    neighbors = []
+    for n in graph.neighbors(parent):
+        weight = graph[parent][n]["weight"]+calculate_distance(graph.nodes[parent]['lat'], graph.nodes[parent]['lon'], graph.nodes[n]['lat'], graph.nodes[n]['lon'])+currentCost
+        if heuristic == "aStar":
+            weight += calculate_distance(graph.nodes[n]['lat'], graph.nodes[n]['lon'], graph.nodes[goalNode]['lat'], graph.nodes[goalNode]['lon'])
+        heapq.heappush(neighbors,(weight+currentCost,parent,n))
+    return neighbors
 
 # --- HELPER: CALCULATE REAL-WORLD DISTANCE ---
 def calculate_distance(y1, x1, y2, x2): # Latitude = y | Longitude = x
@@ -67,34 +138,33 @@ for n in node_ids:
     coordinates.append([graph.nodes[n]['lat'], graph.nodes[n]['lon']])
 kdtree = KDTree(coordinates)
 print("Spatial index (KD-Tree) ready!")
-
-
+print(list(dijkstra(graph,list(graph.nodes)[0],list(graph.nodes)[10])))
 # --- 3. THE ROUTING ENDPOINT ---
 @app.get("/route")
-def calculate_route(start_lat: float, start_lon: float, end_lat: float, end_lon: float):
+def calculate_route(start_lat: float, start_lon: float, end_lat: float, end_lon: float, algorithm: str = "aStar"):
     # 1. Snap the user's clicks to the nearest actual nodes in our graph
     _, start_idx = kdtree.query([start_lat, start_lon])
     _, end_idx = kdtree.query([end_lat, end_lon])
     
     start_node = node_ids[start_idx]
     end_node = node_ids[end_idx]
+    # Unpack the two returned variables
+    path_node_ids, search_history = eval(algorithm)(graph, start_node, end_node)
 
-    try:
-        # 2. Run NetworkX's built-in Dijkstra's shortest path algorithm
-        path_node_ids = nx.shortest_path(graph, source=start_node, target=end_node, weight='weight')
-        
-        # 3. Convert the list of node IDs back into Lat/Lon coordinates for GeoJSON
-        # Note: GeoJSON strictly expects format [longitude, latitude]
-        route_coords = []
-        for n in path_node_ids:
-            route_coords.append([graph.nodes[n]['lon'], graph.nodes[n]['lat']])
-        print(route_coords)
-        return {
+    if not path_node_ids:
+        return {"error": "No path found"}
+
+    route_coords = [[graph.nodes[n]['lon'], graph.nodes[n]['lat']] for n in path_node_ids]
+
+    # Return a custom JSON object containing both pieces of data
+    return {
+        "final_route": {
             "type": "Feature",
             "geometry": {
                 "type": "LineString",
                 "coordinates": route_coords
             }
-        }
-    except nx.NetworkXNoPath:
-        return {"type": "error", "message": "No route found between the selected points."}
+        },
+        "search_history": search_history # Send the history to the frontend!
+    }
+
