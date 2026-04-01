@@ -22,28 +22,30 @@ function initializeMap() {
         if (clicks.length === 2) {
             let start = clicks[0];
             let end = clicks[1];
+            let algorithm = document.getElementById("algorithm").value; // Get selected algorithm
 
             // Fetch the data from your new endpoint
-            let response = await fetch(`http://localhost:8000/route?start_lat=${start.lat}&start_lon=${start.lng}&end_lat=${end.lat}&end_lon=${end.lng}`);
+            let response = await fetch(`http://localhost:8000/route?start_lat=${start.lat}&start_lon=${start.lng}&end_lat=${end.lat}&end_lon=${end.lng}&algorithm=${algorithm}`);
             let data = await response.json();
 
             // 1. ANIMATE THE SEARCH HISTORY
             // We draw the roads the algorithm checked in a light red color
-            for (let i = 0; i < data.search_history.length; i++) {
-                let roadCoords = data.search_history[i];
-                console.log("Drawing search step:", roadCoords);
-                let searchLine = L.polyline(roadCoords, {
+            for (let roadCoords of data.search_history) {
+                console.log("Drawing search step:", roadCoords[0]);
+                let searchLine = L.polyline(roadCoords, {style: { color: 'red', weight: 3, opacity: 1 }}).addTo(map);
+                drawnLayers.push(searchLine); 
+
+                /*let searchLine = L.polyline(roadCoords, {
                     color: '#ff7800', 
                     weight: 2, 
                     opacity: 0.5
-                }).addTo(map);
-                
-                drawnLayers.push(searchLine);
+                }).addTo(map);*/
 
                 // Pause for 5 milliseconds before drawing the next road.
                 // (Decrease this number if the animation is too slow!)
-                await sleep(5); 
-            }
+                
+                await sleep(0.5);
+            };
 
             // 2. DRAW THE FINAL ROUTE
             // Once the animation is done, draw the winning path in thick blue
