@@ -15,29 +15,32 @@ def dijkstra(graph, startNode, goalNode):
     searched = [{"weight":0,"parent":None,"node":startNode}]
     searchHistory = []
     path=[]
-    while searching:
-        if unsearched == []:
+    while searching: ## While searching is true
+        if unsearched == []: ## if unsearched is empty there is no path
             print("No path found")
             return []
-        currentNode = heapq.heappop(unsearched)
-        if currentNode[2] == goalNode:
+        currentNode = heapq.heappop(unsearched) ## get the node with the lowest weight
+        if currentNode[2] == goalNode:          ## if the current node is the goal we are done
             searching = False
             currentNode = {"weight":currentNode[0],"parent":currentNode[1],"node":currentNode[2]}
             print("Found the goal node!")
-            while currentNode["node"] != startNode:
+            while currentNode["node"] != startNode: ## backtrack the path by getting the parent nodes.
                 path.append(currentNode["node"])
                 currentNode = [s for s in searched if s["node"] == currentNode["parent"]][0]
             print("found path")
             return path, searchHistory
         else:
-            searched.append({"weight":currentNode[0],"parent":currentNode[1],"node":currentNode[2]})
-            print("Searching neighbors of node", currentNode[0])
-            for n in getNeighbors(graph, currentNode[2], currentNode[0]):
-                if n[2] not in [s["node"] for s in searched] or n[0] < [s["weight"] for s in searched if s["node"] == n[2]][0]:
-                    currentNode = heapq.heappush(unsearched,n)
-                    lat1, lon1 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
-                    lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
-                    searchHistory.append([[lat1, lon1], [lat2, lon2]])
+            searched.append({"weight":currentNode[0],"parent":currentNode[1],"node":currentNode[2]}) ## put away the searched node
+            neighbors = getNeighbors(graph, currentNode[2], currentNode[0], None, "dijkstra") ## get the neighbors of the current node
+            for n in searched:
+                for neighbor in neighbors:
+                    if neighbor[2] == n["node"] and neighbor[0] >= n["weight"]: ## if the neighbor is in searched and has a higher weight than the searched node we can ignore it
+                        neighbors.remove(neighbor)
+            for n in neighbors: ## for each neighbor
+                currentNode = heapq.heappush(unsearched,n)
+                lat1, lon1 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
+                lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
+                searchHistory.append([[lat1, lon1], [lat2, lon2]])
 
 def aStar(graph, startNode, goalNode):
     searching = True
@@ -49,7 +52,6 @@ def aStar(graph, startNode, goalNode):
         if unsearched == []:
             print("No path found")
             return []
-        heapq.heapify(unsearched)
         currentNode = heapq.heappop(unsearched)
         if currentNode[2] == goalNode:
             searching = False
@@ -62,9 +64,45 @@ def aStar(graph, startNode, goalNode):
             return path, searchHistory
         else:
             searched.append({"weight":currentNode[0],"parent":currentNode[1],"node":currentNode[2]})
-            print("Searching neighbors of node", currentNode[0])
-            for n in getNeighbors(graph, currentNode[2], currentNode[0], goalNode, "aStar"):
-                if n[2] not in [s["node"] for s in searched] or n[0] < [s["weight"] for s in searched if s["node"] == n[2]][0]:
+            neighbors = getNeighbors(graph, currentNode[2], currentNode[0], goalNode, "aStar") ## get the neighbors of the current node
+            for n in searched:
+                for neighbor in neighbors:
+                    if neighbor[2] == n["node"] and neighbor[0] >= n["weight"]: ## if the neighbor is in searched and has a higher weight than the searched node we can ignore it
+                        neighbors.remove(neighbor)
+            for n in neighbors: ## for each neighbor                    
+                    currentNode = heapq.heappush(unsearched,n)
+                    lat1, lon1 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
+                    lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
+                    searchHistory.append([[lat1, lon1], [lat2, lon2]])
+
+def greedBestFirst(graph, startNode, goalNode):
+    searching = True
+    unsearched = getNeighbors(graph, startNode)
+    searched = [{"weight":0,"parent":None,"node":startNode}]
+    searchHistory = []
+    path=[]
+    while searching:
+        if unsearched == []:
+            print("No path found")
+            return []
+        currentNode = heapq.heappop(unsearched)
+        if currentNode[2] == goalNode:
+            searching = False
+            currentNode = {"weight":currentNode[0],"parent":currentNode[1],"node":currentNode[2]}
+            print("Found the goal node!")
+            while currentNode["node"] != startNode:
+                path.append(currentNode["node"])
+                currentNode = [s for s in searched if s["node"] == currentNode["parent"]][0]
+            print("found path")
+            return path, searchHistory
+        else:
+            searched.append({"weight":currentNode[0],"parent":currentNode[1],"node":currentNode[2]})
+            neighbors = getNeighbors(graph, currentNode[2], 0, goalNode, "aStar") ## get the neighbors of the current node
+            for n in searched:
+                for neighbor in neighbors:
+                    if neighbor[2] == n["node"] and neighbor[0] >= n["weight"]: ## if the neighbor is in searched and has a higher weight than the searched node we can ignore it
+                        neighbors.remove(neighbor)
+            for n in neighbors: ## for each neighbor                    
                     currentNode = heapq.heappush(unsearched,n)
                     lat1, lon1 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
                     lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
@@ -72,8 +110,12 @@ def aStar(graph, startNode, goalNode):
 
 def getNeighbors(graph, parent, currentCost=0, goalNode=None, heuristic=None):
     neighbors = []
+    weight = 0
     for n in graph.neighbors(parent):
-        weight = graph[parent][n]["weight"]+calculate_distance(graph.nodes[parent]['lat'], graph.nodes[parent]['lon'], graph.nodes[n]['lat'], graph.nodes[n]['lon'])+currentCost
+        if heuristic != "bestFirst":
+            weight = calculate_distance(graph.nodes[parent]['lat'], graph.nodes[parent]['lon'], graph.nodes[n]['lat'], graph.nodes[n]['lon'])+currentCost
+        else:
+            weight = calculate_distance(graph.nodes[n]['lat'], graph.nodes[n]['lon'], graph.nodes[goalNode]['lat'], graph.nodes[goalNode]['lon'])
         if heuristic == "aStar":
             weight += calculate_distance(graph.nodes[n]['lat'], graph.nodes[n]['lon'], graph.nodes[goalNode]['lat'], graph.nodes[goalNode]['lon'])
         heapq.heappush(neighbors,(weight+currentCost,parent,n))
@@ -86,7 +128,7 @@ def calculate_distance(y1, x1, y2, x2): # Latitude = y | Longitude = x
     radiantsY1, radiantsY2 = math.radians(y1), math.radians(y2)
     distanceLatitude, distanceLongitude = math.radians(y2 - y1), math.radians(x2 - x1)
     a = math.sin(distanceLatitude/2)**2 + math.cos(radiantsY1)*math.cos(radiantsY2)*math.sin(distanceLongitude/2)**2
-    return Equator * (2 * math.atan2(math.sqrt(a), math.sqrt(1 - a)))
+    return (Equator * (2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))))/1000 # Return distance in kilometers
 
 # --- 1. THE OSMIUM HANDLER ---
 class RoutingGraphHandler(osmium.SimpleHandler):
@@ -128,8 +170,6 @@ handler = RoutingGraphHandler()
 handler.apply_file("faroe-islands.osm.pbf", locations=True)
 graph = handler.graph
 
-print(f"Graph ready! Nodes: {len(graph.nodes)}, Edges: {len(graph.edges)}")
-
 # Build a KD-Tree so we can quickly snap map clicks to the nearest valid road node
 node_ids = list(graph.nodes)
 # Scipy KDTree expects a list of [latitude, longitude] pairs
@@ -138,7 +178,6 @@ for n in node_ids:
     coordinates.append([graph.nodes[n]['lat'], graph.nodes[n]['lon']])
 kdtree = KDTree(coordinates)
 print("Spatial index (KD-Tree) ready!")
-print(list(dijkstra(graph,list(graph.nodes)[0],list(graph.nodes)[10])))
 # --- 3. THE ROUTING ENDPOINT ---
 @app.get("/route")
 def calculate_route(start_lat: float, start_lon: float, end_lat: float, end_lon: float, algorithm: str = "aStar"):
@@ -149,6 +188,7 @@ def calculate_route(start_lat: float, start_lon: float, end_lat: float, end_lon:
     start_node = node_ids[start_idx]
     end_node = node_ids[end_idx]
     # Unpack the two returned variables
+    print(f"Calculating route from node {start_node} to node {end_node} using {algorithm}...")
     path_node_ids, search_history = eval(algorithm)(graph, start_node, end_node)
 
     if not path_node_ids:

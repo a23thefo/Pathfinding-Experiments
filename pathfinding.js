@@ -30,9 +30,12 @@ function initializeMap() {
 
             // 1. ANIMATE THE SEARCH HISTORY
             // We draw the roads the algorithm checked in a light red color
+            let sleeptimer = 0;
             for (let roadCoords of data.search_history) {
-                console.log("Drawing search step:", roadCoords[0]);
-                let searchLine = L.polyline(roadCoords, {style: { color: 'red', weight: 3, opacity: 1 }}).addTo(map);
+                sleeptimer++;
+                let line = `${roadCoords[0][0]},${roadCoords[0][1]} ${roadCoords[1][0]},${roadCoords[1][1]}`.split(" ").map(coord => coord.split(",").map(Number));
+                let searchLine = L.polyline(line).addTo(map);
+                searchLine.setStyle({ color: '#ff0000', weight: 5, opacity: 1 });
                 drawnLayers.push(searchLine); 
 
                 /*let searchLine = L.polyline(roadCoords, {
@@ -43,8 +46,10 @@ function initializeMap() {
 
                 // Pause for 5 milliseconds before drawing the next road.
                 // (Decrease this number if the animation is too slow!)
-                
-                await sleep(0.5);
+                if (sleeptimer > 100) {
+                    await sleep(0.5);
+                    sleeptimer = 0;
+                }
             };
 
             // 2. DRAW THE FINAL ROUTE

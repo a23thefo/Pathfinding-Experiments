@@ -8,14 +8,15 @@
     <style> #map { height: 100vh; width: 100%; } body { margin: 0; } </style>
 </head>
 <body>
-    <div>
+    <header>
         <h1>Custom Router</h1>
         <p>Click on the map to set a start and end point, then watch the pathfinding algorithm in action!</p>
         <select id="algorithm">
             <option value="dijkstra">Dijkstra's Algorithm</option>
             <option value="aStar">A* Search</option>
+            <option value="greedBestFirst">Greedy Best-First Search</option>
         </select>
-    </div>
+    </header>
     <div id="map"></div>
 </body>
 </html>
