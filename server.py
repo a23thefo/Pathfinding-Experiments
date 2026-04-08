@@ -4,6 +4,7 @@ import osmium
 import networkx as nx
 import math
 import heapq
+import lmstudio as lms
 from scipy.spatial import KDTree
 
 app = FastAPI()
@@ -41,6 +42,83 @@ def dijkstra(graph, startNode, goalNode):
                 lat1, lon1 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
                 lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
                 searchHistory.append([[lat1, lon1], [lat2, lon2]])
+
+def biDijkstra(graph, startNode, goalNode):
+    print("Starting bidirectional Dijkstra's algorithm...")
+    searching = True
+    unsearchedSearch1 = getNeighbors(graph, startNode)
+    unsearchedSearch2 = getNeighbors(graph, goalNode)
+    searched1 = [{"weight":0,"parent":None,"node":startNode}]
+    searched2 = [{"weight":0,"parent":None,"node":goalNode}]
+    bestPath = float("inf")
+    bestPathNode = None
+    searchHistory = {"search1": [], "search2": []}
+    path=[]
+    while searching: ## While searching is true
+        if unsearchedSearch1 and unsearchedSearch2 == []: ## if unsearched is empty there is no path
+            print("No path found")
+            return []
+        currentNodeSearch1 = heapq.heappop(unsearchedSearch1) ## get the node with the lowest weight
+        currentNodeSearch2 = heapq.heappop(unsearchedSearch2) ## get the node with the lowest weight
+        if currentNodeSearch1[0] > bestPath:          ## if the current node is further than the best path we have found so far we can stop searching
+            unsearchedSearch1 = []
+        if currentNodeSearch2[0] > bestPath:          ## if the current node is further than the best path we have found so far we can stop searching
+            unsearchedSearch2 = []
+        if unsearchedSearch1 != [] and unsearchedSearch2 != []:
+            for s in searched2:
+                if currentNodeSearch1[2] == s["node"]: ## if the current node is in the other search we have found a path
+                    print("Found a path between the two searches!")
+                    if s["weight"] + currentNodeSearch1[0] < bestPath: ## if the path we have found is better than the best path we have found so far we update the best path
+                        bestPath = s["weight"] + currentNodeSearch1[0]
+                        bestPathNode = currentNodeSearch1
+            if bestPathNode != currentNodeSearch1:
+                searched1.append({"weight":currentNodeSearch1[0],"parent":currentNodeSearch1[1],"node":currentNodeSearch1[2]}) ## put away the searched node
+                neighbors = getNeighbors(graph, currentNodeSearch1[2], currentNodeSearch1[0], None, "dijkstra") ## get the neighbors of the current node
+                for n in searched1:
+                    for neighbor in neighbors:
+                        if neighbor[2] == n["node"] and neighbor[0] >= n["weight"]: ## if the neighbor is in searched and has a higher weight than the searched node we can ignore it
+                            neighbors.remove(neighbor)
+                for n in neighbors: ## for each neighbor                    
+                    heapq.heappush(unsearchedSearch1,n)
+                    lat1, lon1 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
+                    lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
+                    searchHistory["search1"].append([[lat1, lon1], [lat2, lon2]])
+            for s in searched1:
+                if currentNodeSearch2[2] == s["node"]: ## if the current node is in the other search we have found a path
+                    print("Found a path between the two searches!")
+                    if s["weight"] + currentNodeSearch2[0] < bestPath: ## if the path we have found is better than the best path we have found so far we update the best path
+                        bestPath = s["weight"] + currentNodeSearch2[0]
+                        bestPathNode = currentNodeSearch2
+            if bestPathNode != currentNodeSearch2:
+                searched2.append({"weight":currentNodeSearch2[0],"parent":currentNodeSearch2[1],"node":currentNodeSearch2[2]}) ## put away the searched node
+                neighbors = getNeighbors(graph, currentNodeSearch2[2], currentNodeSearch2[0], None, "dijkstra") ## get the neighbors of the current node
+                for n in searched2:
+                    for neighbor in neighbors:
+                        if neighbor[2] == n["node"] and neighbor[0] >= n["weight"]: ## if the neighbor is in searched and has a higher weight than the searched node we can ignore it
+                            neighbors.remove(neighbor)
+                for n in neighbors: ## for each neighbor                    
+                    heapq.heappush(unsearchedSearch2,n)
+                    lat1, lon1 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
+                    lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
+                    searchHistory["search2"].append([[lat1, lon1], [lat2, lon2]])
+        else:
+            searching = False
+            print("Found the goal node!")
+            print("Best path found has weight:", bestPathNode)
+            currentNode1 = [s for s in searched1 if s["node"] == bestPathNode[2]][0]
+            currentNode2 = [s for s in searched2 if s["node"] == bestPathNode[2]][0]
+            print(currentNode1["node"], currentNode2["node"], startNode)
+            while currentNode1["node"] != startNode: ## backtrack the path by getting the parent nodes.
+                path.append(currentNode1["node"])
+                currentNode1 = [s for s in searched1 if s["node"] == currentNode1["parent"]][0]
+            path.reverse()
+            while currentNode2["node"] != goalNode: ## backtrack the path by getting the parent nodes.
+                path.append(currentNode2["node"])
+                currentNode2 = [s for s in searched2 if s["node"] == currentNode2["parent"]][0]
+            print("found path")
+            return path, searchHistory
+
+
 
 def aStar(graph, startNode, goalNode):
     searching = True
@@ -108,15 +186,22 @@ def greedBestFirst(graph, startNode, goalNode):
                     lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
                     searchHistory.append([[lat1, lon1], [lat2, lon2]])
 
+def LLMAStar(graph, startNode, goalNode):
+    model = lms.llm("meta-llama-3.1-8b-instruct:2")
+    result = model.respond("What is the meaning of life?")
+    print(result)
+    # This is a placeholder for the LLM-augmented A* algorithm. You can implement it similarly to the regular A* but with an additional heuristic component that queries an LLM for guidance.
+    pass
+
 def getNeighbors(graph, parent, currentCost=0, goalNode=None, heuristic=None):
     neighbors = []
     weight = 0
     for n in graph.neighbors(parent):
         if heuristic != "bestFirst":
-            weight = calculate_distance(graph.nodes[parent]['lat'], graph.nodes[parent]['lon'], graph.nodes[n]['lat'], graph.nodes[n]['lon'])+currentCost
+            weight = calculate_distance(graph.nodes[n]['lat'], graph.nodes[n]['lon'], graph.nodes[parent]['lat'], graph.nodes[parent]['lon'])
         else:
             weight = calculate_distance(graph.nodes[n]['lat'], graph.nodes[n]['lon'], graph.nodes[goalNode]['lat'], graph.nodes[goalNode]['lon'])
-        if heuristic == "aStar":
+        if heuristic == "aStar":  
             weight += calculate_distance(graph.nodes[n]['lat'], graph.nodes[n]['lon'], graph.nodes[goalNode]['lat'], graph.nodes[goalNode]['lon'])
         heapq.heappush(neighbors,(weight+currentCost,parent,n))
     return neighbors
