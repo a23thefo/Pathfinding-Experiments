@@ -44,7 +44,6 @@ def dijkstra(graph, startNode, goalNode):
                 searchHistory.append([[lat1, lon1], [lat2, lon2]])
 
 def biDijkstra(graph, startNode, goalNode):
-    print("Starting bidirectional Dijkstra's algorithm...")
     searching = True
     unsearchedSearch1 = getNeighbors(graph, startNode)
     unsearchedSearch2 = getNeighbors(graph, goalNode)
@@ -104,10 +103,8 @@ def biDijkstra(graph, startNode, goalNode):
         else:
             searching = False
             print("Found the goal node!")
-            print("Best path found has weight:", bestPathNode)
             currentNode1 = [s for s in searched1 if s["node"] == bestPathNode[2]][0]
             currentNode2 = [s for s in searched2 if s["node"] == bestPathNode[2]][0]
-            print(currentNode1["node"], currentNode2["node"], startNode)
             while currentNode1["node"] != startNode: ## backtrack the path by getting the parent nodes.
                 path.append(currentNode1["node"])
                 currentNode1 = [s for s in searched1 if s["node"] == currentNode1["parent"]][0]
@@ -225,19 +222,16 @@ class RoutingGraphHandler(osmium.SimpleHandler):
     def __init__(self):
         super().__init__()
         self.graph = nx.Graph()
-
     def way(self, w):
         # Only process ways (lines) that are marked as a 'highway' (OSM's tag for any road/path)
         if 'highway' in w.tags:
             # Skip things cars can't drive on (you can adjust this list later)
             if w.tags['highway'] in ['pedestrian', 'footway', 'steps', 'path']:
                 return
-
             # A 'way' is made of multiple nodes. We connect them as edges in our graph.
             nodes = w.nodes
             for i in range(len(nodes) - 1):
                 node1, node2 = nodes[i], nodes[i+1]
-                
                 try:
                     # Grab coordinates (requires locations=True when applying the handler)
                     y1, x1 = node1.location.lat, node1.location.lon
@@ -278,7 +272,6 @@ async def calculate_route(start_lat: float, start_lon: float, end_lat: float, en
     start_node = node_ids[start_idx]
     end_node = node_ids[end_idx]
     # Unpack the two returned variables
-    print(graph.nodes)
     if(algorithm == "LLMAStar"):
         path_node_ids, search_history = await LLMAStar(graph, start_node, end_node)
     else:
