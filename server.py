@@ -4,7 +4,7 @@ import osmium
 import networkx as nx
 import math
 import heapq
-import lmstudio as lms
+import requests
 from scipy.spatial import KDTree
 
 app = FastAPI()
@@ -186,12 +186,17 @@ def greedBestFirst(graph, startNode, goalNode):
                     lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
                     searchHistory.append([[lat1, lon1], [lat2, lon2]])
 
-def LLMAStar(graph, startNode, goalNode):
-    model = lms.llm("meta-llama-3.1-8b-instruct:2")
-    result = model.respond("What is the meaning of life?")
-    print(result)
+async def LLMAStar(graph, startNode, goalNode):
+    print("we in")
+    url = "http://127.0.0.1:1234/api/v1/chat"
+    data = {
+        "model": "llama-2-13b-chat", "input": f"Using these nodes for routing {graph.nodes} find a path from {startNode} to {goalNode}", "context_length": 16000
+    }
+    headers = {"Content-Type": "application/json", "Authorization": "Bearer sk-lm-NiFOETAj:og35tLR1RpwDZdHaB52p"}
+    response = requests.post(url, json=data, headers=headers)
+    print("LLM response:", response.json())
     # This is a placeholder for the LLM-augmented A* algorithm. You can implement it similarly to the regular A* but with an additional heuristic component that queries an LLM for guidance.
-    pass
+    return [], []
 
 def getNeighbors(graph, parent, currentCost=0, goalNode=None, heuristic=None):
     neighbors = []
@@ -265,7 +270,7 @@ kdtree = KDTree(coordinates)
 print("Spatial index (KD-Tree) ready!")
 # --- 3. THE ROUTING ENDPOINT ---
 @app.get("/route")
-def calculate_route(start_lat: float, start_lon: float, end_lat: float, end_lon: float, algorithm: str = "aStar"):
+async def calculate_route(start_lat: float, start_lon: float, end_lat: float, end_lon: float, algorithm: str = "aStar"):
     # 1. Snap the user's clicks to the nearest actual nodes in our graph
     _, start_idx = kdtree.query([start_lat, start_lon])
     _, end_idx = kdtree.query([end_lat, end_lon])
@@ -273,8 +278,11 @@ def calculate_route(start_lat: float, start_lon: float, end_lat: float, end_lon:
     start_node = node_ids[start_idx]
     end_node = node_ids[end_idx]
     # Unpack the two returned variables
-    print(f"Calculating route from node {start_node} to node {end_node} using {algorithm}...")
-    path_node_ids, search_history = eval(algorithm)(graph, start_node, end_node)
+    print(graph.nodes)
+    if(algorithm == "LLMAStar"):
+        path_node_ids, search_history = await LLMAStar(graph, start_node, end_node)
+    else:
+        path_node_ids, search_history = eval(algorithm)(graph, start_node, end_node)
 
     if not path_node_ids:
         return {"error": "No path found"}
