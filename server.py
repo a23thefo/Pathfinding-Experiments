@@ -52,68 +52,81 @@ def biDijkstra(graph, startNode, goalNode):
     bestPath = float("inf")
     bestPathNode = None
     searchHistory = {"search1": [], "search2": []}
-    path=[]
     while searching: ## While searching is true
-        if unsearchedSearch1 and unsearchedSearch2 == []: ## if unsearched is empty there is no path
+        if unsearchedSearch1 == [] or unsearchedSearch2 == []: ## if unsearched is empty there is no path
             print("No path found")
-            return []
+            searching = False
+            return [], searchHistory
         currentNodeSearch1 = heapq.heappop(unsearchedSearch1) ## get the node with the lowest weight
         currentNodeSearch2 = heapq.heappop(unsearchedSearch2) ## get the node with the lowest weight
-        if currentNodeSearch1[0] > bestPath:          ## if the current node is further than the best path we have found so far we can stop searching
-            unsearchedSearch1 = []
-        if currentNodeSearch2[0] > bestPath:          ## if the current node is further than the best path we have found so far we can stop searching
-            unsearchedSearch2 = []
-        if unsearchedSearch1 != [] and unsearchedSearch2 != []:
-            for s in searched2:
-                if currentNodeSearch1[2] == s["node"]: ## if the current node is in the other search we have found a path
-                    print("Found a path between the two searches!")
-                    if s["weight"] + currentNodeSearch1[0] < bestPath: ## if the path we have found is better than the best path we have found so far we update the best path
-                        bestPath = s["weight"] + currentNodeSearch1[0]
-                        bestPathNode = currentNodeSearch1
-            if bestPathNode != currentNodeSearch1:
-                searched1.append({"weight":currentNodeSearch1[0],"parent":currentNodeSearch1[1],"node":currentNodeSearch1[2]}) ## put away the searched node
-                neighbors = getNeighbors(graph, currentNodeSearch1[2], currentNodeSearch1[0], None, "dijkstra") ## get the neighbors of the current node
-                for n in searched1:
-                    for neighbor in neighbors:
-                        if neighbor[2] == n["node"] and neighbor[0] >= n["weight"]: ## if the neighbor is in searched and has a higher weight than the searched node we can ignore it
-                            neighbors.remove(neighbor)
-                for n in neighbors: ## for each neighbor                    
-                    heapq.heappush(unsearchedSearch1,n)
-                    lat1, lon1 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
-                    lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
-                    searchHistory["search1"].append([[lat1, lon1], [lat2, lon2]])
-            for s in searched1:
-                if currentNodeSearch2[2] == s["node"]: ## if the current node is in the other search we have found a path
-                    print("Found a path between the two searches!")
-                    if s["weight"] + currentNodeSearch2[0] < bestPath: ## if the path we have found is better than the best path we have found so far we update the best path
-                        bestPath = s["weight"] + currentNodeSearch2[0]
-                        bestPathNode = currentNodeSearch2
-            if bestPathNode != currentNodeSearch2:
-                searched2.append({"weight":currentNodeSearch2[0],"parent":currentNodeSearch2[1],"node":currentNodeSearch2[2]}) ## put away the searched node
-                neighbors = getNeighbors(graph, currentNodeSearch2[2], currentNodeSearch2[0], None, "dijkstra") ## get the neighbors of the current node
-                for n in searched2:
-                    for neighbor in neighbors:
-                        if neighbor[2] == n["node"] and neighbor[0] >= n["weight"]: ## if the neighbor is in searched and has a higher weight than the searched node we can ignore it
-                            neighbors.remove(neighbor)
-                for n in neighbors: ## for each neighbor                    
-                    heapq.heappush(unsearchedSearch2,n)
-                    lat1, lon1 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
-                    lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
-                    searchHistory["search2"].append([[lat1, lon1], [lat2, lon2]])
-        else:
-            searching = False
-            print("Found the goal node!")
-            currentNode1 = [s for s in searched1 if s["node"] == bestPathNode[2]][0]
-            currentNode2 = [s for s in searched2 if s["node"] == bestPathNode[2]][0]
-            while currentNode1["node"] != startNode: ## backtrack the path by getting the parent nodes.
-                path.append(currentNode1["node"])
-                currentNode1 = [s for s in searched1 if s["node"] == currentNode1["parent"]][0]
-            path.reverse()
-            while currentNode2["node"] != goalNode: ## backtrack the path by getting the parent nodes.
-                path.append(currentNode2["node"])
-                currentNode2 = [s for s in searched2 if s["node"] == currentNode2["parent"]][0]
-            print("found path")
-            return path, searchHistory
+        for s in searched2:
+            searched1, bestPath, bestPathFound, bestPathNode = pathfinderBiDjikstra(s, currentNodeSearch1, searched1, bestPath, bestPathNode)
+            if bestPathFound:
+                searching = False
+                print("Found the goal node!")
+                return pathRenderBiDjikstra(searched1, searched2, bestPathNode, startNode, goalNode), searchHistory
+        if bestPathNode != currentNodeSearch1:
+            searched1.append({"weight":currentNodeSearch1[0],"parent":currentNodeSearch1[1],"node":currentNodeSearch1[2]}) ## put away the searched node
+            neighbors = getNeighbors(graph, currentNodeSearch1[2], currentNodeSearch1[0], None, "dijkstra") ## get the neighbors of the current node
+            for n in searched1:
+                for neighbor in neighbors:
+                    if neighbor[2] == n["node"] and neighbor[0] >= n["weight"]: ## if the neighbor is in searched and has a higher weight than the searched node we can ignore it
+                        neighbors.remove(neighbor)
+            for n in neighbors: ## for each neighbor                    
+                heapq.heappush(unsearchedSearch1,n)
+                lat1, lon1 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
+                lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
+                searchHistory["search1"].append([[lat1, lon1], [lat2, lon2]])
+        for s in searched1:
+            searched2, bestPath, bestPathFound, bestPathNode = pathfinderBiDjikstra(s, currentNodeSearch2, searched2, bestPath, bestPathNode)
+            if bestPathFound:
+                searching = False
+                print("Found the goal node!")
+                return pathRenderBiDjikstra(searched1, searched2, bestPathNode, startNode, goalNode), searchHistory
+        if bestPathNode != currentNodeSearch2:
+            searched2.append({"weight":currentNodeSearch2[0],"parent":currentNodeSearch2[1],"node":currentNodeSearch2[2]}) ## put away the searched node
+            neighbors = getNeighbors(graph, currentNodeSearch2[2], currentNodeSearch2[0], None, "dijkstra") ## get the neighbors of the current node
+            for n in searched2:
+                for neighbor in neighbors:
+                    if neighbor[2] == n["node"] and neighbor[0] >= n["weight"]: ## if the neighbor is in searched and has a higher weight than the searched node we can ignore it
+                        neighbors.remove(neighbor)
+            for n in neighbors: ## for each neighbor                    
+                heapq.heappush(unsearchedSearch2,n)
+                lat1, lon1 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
+                lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
+                searchHistory["search2"].append([[lat1, lon1], [lat2, lon2]])
+
+def pathfinderBiDjikstra(node, currentNode, searchedList, bestPath, bestPathNode):
+    bestPathFound = False
+    if currentNode == node["node"]: ## if the current node is in the other search we have found a path
+        print("Found a path between the two searches!")
+        if node["weight"] + currentNode[0] < bestPath: ## if the path we have found is better than the best path we have found so far we update the best path
+            searchedList.append({"weight":currentNode[0],"parent":currentNode[1],"node":currentNode[2]})
+            bestPath = node["weight"] + currentNode[0]
+            bestPathNode = currentNode
+        elif node["weight"] + currentNode[0] > bestPath: ## if the path we have found is equal to the best path we have found so far we can choose either one as the best path
+            bestPathFound = True
+    return searchedList, bestPath, bestPathFound, bestPathNode
+
+def pathRenderBiDjikstra(searched1, searched2, bestPathNode, startNode, goalNode):
+    path = []
+    currentNode1, currentNode2 = None, None
+    for s in searched1:
+        if bestPathNode[2] == s["node"]:
+            currentNode1 = s
+    for s in searched2:
+        if bestPathNode[2] == s["node"]:
+            currentNode2 = s
+    print(currentNode1, currentNode2)
+    while currentNode1["node"] != startNode: ## backtrack the path by getting the parent nodes.
+        path.append(currentNode1["node"])
+        currentNode1 = [s for s in searched1 if s["node"] == currentNode1["parent"]][0]
+    path.reverse()
+    while currentNode2["node"] != goalNode: ## backtrack the path by getting the parent nodes.
+        path.append(currentNode2["node"])
+        currentNode2 = [s for s in searched2 if s["node"] == currentNode2["parent"]][0]
+    print("found path")
+    return path 
 
 
 
@@ -265,6 +278,15 @@ print("Spatial index (KD-Tree) ready!")
 # --- 3. THE ROUTING ENDPOINT ---
 @app.get("/route")
 async def calculate_route(start_lat: float, start_lon: float, end_lat: float, end_lon: float, algorithm: str = "aStar"):
+    all_variables = dir()
+
+    # Iterate over the whole list where dir( )
+    # is stored.
+    for name in all_variables:
+        # Print the item if it doesn't start with '__'
+        if not name.startswith('__'):
+            myvalue = eval(name)
+            print(name, "is", type(myvalue), "and is equal to ", myvalue)
     # 1. Snap the user's clicks to the nearest actual nodes in our graph
     _, start_idx = kdtree.query([start_lat, start_lon])
     _, end_idx = kdtree.query([end_lat, end_lon])
@@ -277,7 +299,7 @@ async def calculate_route(start_lat: float, start_lon: float, end_lat: float, en
     else:
         path_node_ids, search_history = eval(algorithm)(graph, start_node, end_node)
 
-    if not path_node_ids:
+    if path_node_ids == []:
         return {"error": "No path found"}
 
     route_coords = [[graph.nodes[n]['lon'], graph.nodes[n]['lat']] for n in path_node_ids]

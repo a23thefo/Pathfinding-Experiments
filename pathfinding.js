@@ -28,6 +28,15 @@ function initializeMap() {
             let response = await fetch(`http://localhost:8000/route?start_lat=${start.lat}&start_lon=${start.lng}&end_lat=${end.lat}&end_lon=${end.lng}&algorithm=${algorithm}`);
             let data = await response.json();
 
+            if(data.error) {
+                alert(data.error);
+                // Clear the markers for the next attempt
+                drawnLayers.forEach(layer => map.removeLayer(layer));
+                drawnLayers = [];
+                clicks = [];
+                return;
+            }
+
             // 1. ANIMATE THE SEARCH HISTORY
             // We draw the roads the algorithm checked in a light red color
             let sleeptimer = 0;
