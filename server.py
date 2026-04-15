@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import osmium
@@ -51,6 +53,7 @@ def biDijkstra(graph, startNode, goalNode):
     searched2 = [{"weight":0,"parent":None,"node":goalNode}]
     bestPath = float("inf")
     bestPathNode = None
+    pathsFound = 0
     searchHistory = {"search1": [], "search2": []}
     while searching: ## While searching is true
         if unsearchedSearch1 == [] or unsearchedSearch2 == []: ## if unsearched is empty there is no path
@@ -60,7 +63,7 @@ def biDijkstra(graph, startNode, goalNode):
         currentNodeSearch1 = heapq.heappop(unsearchedSearch1) ## get the node with the lowest weight
         currentNodeSearch2 = heapq.heappop(unsearchedSearch2) ## get the node with the lowest weight
         for s in searched2:
-            searched1, bestPath, bestPathFound, bestPathNode = pathfinderBiDjikstra(s, currentNodeSearch1, searched1, bestPath, bestPathNode)
+            searched1, bestPath, bestPathFound, bestPathNode, pathsFound = pathfinderBiDjikstra(s, currentNodeSearch1, searched1, bestPath, bestPathNode, pathsFound)
             if bestPathFound:
                 searching = False
                 print("Found the goal node!")
@@ -78,7 +81,7 @@ def biDijkstra(graph, startNode, goalNode):
                 lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
                 searchHistory["search1"].append([[lat1, lon1], [lat2, lon2]])
         for s in searched1:
-            searched2, bestPath, bestPathFound, bestPathNode = pathfinderBiDjikstra(s, currentNodeSearch2, searched2, bestPath, bestPathNode)
+            searched2, bestPath, bestPathFound, bestPathNode, pathsFound = pathfinderBiDjikstra(s, currentNodeSearch2, searched2, bestPath, bestPathNode, pathsFound)
             if bestPathFound:
                 searching = False
                 print("Found the goal node!")
@@ -96,17 +99,19 @@ def biDijkstra(graph, startNode, goalNode):
                 lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
                 searchHistory["search2"].append([[lat1, lon1], [lat2, lon2]])
 
-def pathfinderBiDjikstra(node, currentNode, searchedList, bestPath, bestPathNode):
+def pathfinderBiDjikstra(node, currentNode, searchedList, bestPath, bestPathNode, pathsFound=0):
     bestPathFound = False
-    if currentNode == node["node"]: ## if the current node is in the other search we have found a path
-        print("Found a path between the two searches!")
+    if currentNode[2] == node["node"]: ## if the current node is in the other search we have found a path
+        os.system('clear')
+        pathsFound += 1
+        print("Paths found so far: ", pathsFound)
         if node["weight"] + currentNode[0] < bestPath: ## if the path we have found is better than the best path we have found so far we update the best path
             searchedList.append({"weight":currentNode[0],"parent":currentNode[1],"node":currentNode[2]})
             bestPath = node["weight"] + currentNode[0]
             bestPathNode = currentNode
-        elif node["weight"] + currentNode[0] > bestPath: ## if the path we have found is equal to the best path we have found so far we can choose either one as the best path
+        elif node["weight"] + currentNode[0] == bestPath: ## if the path we have found is equal to the best path we have found so far we can choose either one as the best path
             bestPathFound = True
-    return searchedList, bestPath, bestPathFound, bestPathNode
+    return searchedList, bestPath, bestPathFound, bestPathNode, pathsFound
 
 def pathRenderBiDjikstra(searched1, searched2, bestPathNode, startNode, goalNode):
     path = []
