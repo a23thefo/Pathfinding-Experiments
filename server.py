@@ -50,6 +50,8 @@ def biDijkstra(graph, startNode, goalNode):
     unsearchedSearch1 = getNeighbors(graph, startNode)
     unsearchedSearch2 = getNeighbors(graph, goalNode)
     searched1 = [{"weight":0,"parent":None,"node":startNode}]
+    searched1Visited = dict()
+    searched2Visited = dict()
     searched2 = [{"weight":0,"parent":None,"node":goalNode}]
     bestPath = float("inf")
     bestPathNode = None
@@ -62,38 +64,49 @@ def biDijkstra(graph, startNode, goalNode):
             return [], searchHistory
         currentNodeSearch1 = heapq.heappop(unsearchedSearch1) ## get the node with the lowest weight
         currentNodeSearch2 = heapq.heappop(unsearchedSearch2) ## get the node with the lowest weight
-        for s in searched2:
-            searched1, bestPath, bestPathFound, bestPathNode, pathsFound = pathfinderBiDjikstra(s, currentNodeSearch1, searched1, bestPath, bestPathNode, pathsFound)
-            if bestPathFound:
-                searching = False
-                print("Found the goal node!")
-                return pathRenderBiDjikstra(searched1, searched2, bestPathNode, startNode, goalNode), searchHistory
-        if bestPathNode != currentNodeSearch1:
-            searched1.append({"weight":currentNodeSearch1[0],"parent":currentNodeSearch1[1],"node":currentNodeSearch1[2]}) ## put away the searched node
-            neighbors = getNeighbors(graph, currentNodeSearch1[2], currentNodeSearch1[0], None, "dijkstra") ## get the neighbors of the current node
-            for n in searched1:
-                for neighbor in neighbors:
-                    if neighbor[2] == n["node"] and neighbor[0] >= n["weight"]: ## if the neighbor is in searched and has a higher weight than the searched node we can ignore it
-                        neighbors.remove(neighbor)
-            for n in neighbors: ## for each neighbor                    
+        neighbor1, neighbor2 = None, None
+
+        searched1Visited[currentNodeSearch1[2]] = currentNodeSearch1[0]   
+        searched1.append({"weight":currentNodeSearch1[0],"parent":currentNodeSearch1[1],"node":currentNodeSearch1[2]}) ## put away the searched node
+        neighbor1 = getNeighbors(graph, currentNodeSearch1[2], currentNodeSearch1[0], None, "dijkstra")
+        searched1, bestPath, bestPathFound, bestPathNode, pathsFound = pathfinderBiDjikstra(searched2Visited.get(currentNodeSearch1[2]), currentNodeSearch1, searched1, bestPath, bestPathNode, pathsFound)
+        if bestPathFound:
+            searching = False
+            print("Found the goal node!")
+            return pathRenderBiDjikstra(searched1, searched2, bestPathNode, startNode, goalNode), searchHistory
+        tempNeighbor1 = neighbor1.copy() if neighbor1 else None
+        if(neighbor1):
+            for neighbor in neighbor1:
+                if searched1Visited.get(neighbor[2]) is not None and neighbor[0] >= searched1Visited.get(neighbor[2]):
+                    tempNeighbor1.remove(neighbor)
+        if(tempNeighbor1):
+            for n in tempNeighbor1: ## for each neighbor                    
                 heapq.heappush(unsearchedSearch1,n)
                 lat1, lon1 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
                 lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
                 searchHistory["search1"].append([[lat1, lon1], [lat2, lon2]])
-        for s in searched1:
-            searched2, bestPath, bestPathFound, bestPathNode, pathsFound = pathfinderBiDjikstra(s, currentNodeSearch2, searched2, bestPath, bestPathNode, pathsFound)
-            if bestPathFound:
-                searching = False
-                print("Found the goal node!")
-                return pathRenderBiDjikstra(searched1, searched2, bestPathNode, startNode, goalNode), searchHistory
-        if bestPathNode != currentNodeSearch2:
-            searched2.append({"weight":currentNodeSearch2[0],"parent":currentNodeSearch2[1],"node":currentNodeSearch2[2]}) ## put away the searched node
-            neighbors = getNeighbors(graph, currentNodeSearch2[2], currentNodeSearch2[0], None, "dijkstra") ## get the neighbors of the current node
-            for n in searched2:
-                for neighbor in neighbors:
-                    if neighbor[2] == n["node"] and neighbor[0] >= n["weight"]: ## if the neighbor is in searched and has a higher weight than the searched node we can ignore it
-                        neighbors.remove(neighbor)
-            for n in neighbors: ## for each neighbor                    
+        
+        searched2.append({"weight":currentNodeSearch2[0],"parent":currentNodeSearch2[1],"node":currentNodeSearch2[2]}) ## put away the searched node
+        searched2Visited[currentNodeSearch2[2]] = currentNodeSearch2[0]   
+        neighbor2 = getNeighbors(graph, currentNodeSearch2[2], currentNodeSearch2[0], None, "dijkstra") ## get the neighbors of the current node    
+        searched2, bestPath, bestPathFound, bestPathNode, pathsFound = pathfinderBiDjikstra(searched1Visited.get(currentNodeSearch2[2]), currentNodeSearch2, searched2, bestPath, bestPathNode, pathsFound)
+        if bestPathFound:
+            searching = False
+            print("Found the goal node!")
+            return pathRenderBiDjikstra(searched1, searched2, bestPathNode, startNode, goalNode), searchHistory
+        tempNeighbor2 = neighbor2.copy() if neighbor2 else None
+        if(neighbor2):
+            for neighbor in neighbor2:
+                if searched2Visited.get(neighbor[2]) is not None and neighbor[0] >= searched2Visited[neighbor[2]]: ## if the neighbor is in searched and has a higher weight than the searched node we can ignore it
+                    tempNeighbor2.remove(neighbor)
+                    continue
+                for n in unsearchedSearch2:
+                    if neighbor[2] == n[2] and neighbor[0] >= n[0]: ## if the neighbor is in unsearched and has a higher weight than the unsearched node we can ignore it
+                        tempNeighbor2.remove(neighbor)
+                        break
+        if(tempNeighbor2):
+            for n in tempNeighbor2: ## for each neighbor         
+                print("adding neighbor: ", n)        
                 heapq.heappush(unsearchedSearch2,n)
                 lat1, lon1 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
                 lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
@@ -101,15 +114,16 @@ def biDijkstra(graph, startNode, goalNode):
 
 def pathfinderBiDjikstra(node, currentNode, searchedList, bestPath, bestPathNode, pathsFound=0):
     bestPathFound = False
-    if currentNode[2] == node["node"]: ## if the current node is in the other search we have found a path
-        os.system('clear')
+    print("current node: ", currentNode, "node in other search: ", node)
+    if node: ## if the current node is in the other search we have found a path
+        ##os.system('clear')
         pathsFound += 1
-        print("Paths found so far: ", pathsFound)
-        if node["weight"] + currentNode[0] < bestPath: ## if the path we have found is better than the best path we have found so far we update the best path
+        print("Paths found so far: ", pathsFound, "Current best path: ", bestPath, "km")
+        if node + currentNode[0] < bestPath: ## if the path we have found is better than the best path we have found so far we update the best path
             searchedList.append({"weight":currentNode[0],"parent":currentNode[1],"node":currentNode[2]})
-            bestPath = node["weight"] + currentNode[0]
+            bestPath = node + currentNode[0]
             bestPathNode = currentNode
-        elif node["weight"] + currentNode[0] == bestPath: ## if the path we have found is equal to the best path we have found so far we can choose either one as the best path
+        elif node + currentNode[0] > bestPath: ## if the path we have found is equal to the best path we have found so far we can choose either one as the best path
             bestPathFound = True
     return searchedList, bestPath, bestPathFound, bestPathNode, pathsFound
 
