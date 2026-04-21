@@ -105,8 +105,7 @@ def biDijkstra(graph, startNode, goalNode):
                         tempNeighbor2.remove(neighbor)
                         break
         if(tempNeighbor2):
-            for n in tempNeighbor2: ## for each neighbor         
-                print("adding neighbor: ", n)        
+            for n in tempNeighbor2: ## for each neighbor              
                 heapq.heappush(unsearchedSearch2,n)
                 lat1, lon1 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
                 lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
@@ -136,7 +135,6 @@ def pathRenderBiDjikstra(searched1, searched2, bestPathNode, startNode, goalNode
     for s in searched2:
         if bestPathNode[2] == s["node"]:
             currentNode2 = s
-    print(currentNode1, currentNode2)
     while currentNode1["node"] != startNode: ## backtrack the path by getting the parent nodes.
         path.append(currentNode1["node"])
         currentNode1 = [s for s in searched1 if s["node"] == currentNode1["parent"]][0]
@@ -285,7 +283,7 @@ class RoutingGraphHandler(osmium.SimpleHandler):
 print("Parsing OSM data and building graph... (This takes a moment)")
 handler = RoutingGraphHandler()
 # locations=True tells osmium to cache node coordinates so ways can access them
-handler.apply_file("faroe-islands.osm.pbf", locations=True)
+handler.apply_file("ireland-and-northern-ireland.osm.pbf", locations=True)
 graph = handler.graph
 
 # Build a KD-Tree so we can quickly snap map clicks to the nearest valid road node
