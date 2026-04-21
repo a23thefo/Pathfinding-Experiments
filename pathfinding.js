@@ -39,11 +39,12 @@ function initializeMap() {
 
             // 1. ANIMATE THE SEARCH HISTORY
             // We draw the roads the algorithm checked in a light red color
-            let sleeptimer = 0;
+            let sleepcounter = 0;
+            let sleeptimer = 100;
             if (algorithm === "biDijkstra") {
                 console.log("Drawing search history for bidirectional search:", data.search_history);
                 for (let roadCoords of data.search_history["search1"]) {
-                    sleeptimer++;
+                    sleepcounter++;
                     let line = `${roadCoords[0][0]},${roadCoords[0][1]} ${roadCoords[1][0]},${roadCoords[1][1]}`.split(" ").map(coord => coord.split(",").map(Number));
                     let searchLine = L.polyline(line).addTo(map);
                     searchLine.setStyle({ color: '#ff0000', weight: 5, opacity: 1 });
@@ -57,13 +58,16 @@ function initializeMap() {
 
                     // Pause for 5 milliseconds before drawing the next road.
                     // (Decrease this number if the animation is too slow!)
-                    if (sleeptimer > 100) {
+                    if (sleepcounter > sleeptimer) {
                         await sleep(0.5);
-                        sleeptimer = 0;
+                        sleepcounter = 0;
+                        sleeptimer = sleeptimer * 1.05;
                     }
                 }
+                sleepcounter = 0;
+                sleeptimer = 100;
                 for (let roadCoords of data.search_history["search2"]) {
-                    sleeptimer++;
+                    sleepcounter++;
                     let line = `${roadCoords[0][0]},${roadCoords[0][1]} ${roadCoords[1][0]},${roadCoords[1][1]}`.split(" ").map(coord => coord.split(",").map(Number));
                     let searchLine = L.polyline(line).addTo(map);
                     searchLine.setStyle({ color: '#00ddff', weight: 5, opacity: 1 });
@@ -77,15 +81,16 @@ function initializeMap() {
 
                     // Pause for 5 milliseconds before drawing the next road.
                     // (Decrease this number if the animation is too slow!)
-                    if (sleeptimer > 100) {
+                    if (sleepcounter > sleeptimer) {
                         await sleep(0.5);
-                        sleeptimer = 0;
+                        sleepcounter = 0;
+                        sleeptimer = sleeptimer * 1.05;
                     }
                 }
                 
             }else { 
                 for (let roadCoords of data.search_history) {
-                    sleeptimer++;
+                    sleepcounter++;
                     let line = `${roadCoords[0][0]},${roadCoords[0][1]} ${roadCoords[1][0]},${roadCoords[1][1]}`.split(" ").map(coord => coord.split(",").map(Number));
                     let searchLine = L.polyline(line).addTo(map);
                     searchLine.setStyle({ color: '#ff0000', weight: 5, opacity: 1 });
@@ -99,9 +104,10 @@ function initializeMap() {
 
                     // Pause for 5 milliseconds before drawing the next road.
                     // (Decrease this number if the animation is too slow!)
-                    if (sleeptimer > 100) {
+                    if (sleepcounter > sleeptimer) {
                         await sleep(0.5);
-                        sleeptimer = 0;
+                        sleepcounter = 0;
+                        sleeptimer = sleeptimer * 1.05; // Gradually increase the sleep time to slow down the animation as it progresses
                     }
                 };
             }

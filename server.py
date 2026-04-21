@@ -153,6 +153,7 @@ def aStar(graph, startNode, goalNode):
     searching = True
     unsearched = getNeighbors(graph, startNode)
     searched = [{"weight":0,"parent":None,"node":startNode}]
+    visited = dict()
     searchHistory = []
     path=[]
     while searching:
@@ -171,11 +172,12 @@ def aStar(graph, startNode, goalNode):
             return path, searchHistory
         else:
             searched.append({"weight":currentNode[0],"parent":currentNode[1],"node":currentNode[2]})
+            visited[currentNode[2]] = currentNode[0]
             neighbors = getNeighbors(graph, currentNode[2], currentNode[0], goalNode, "aStar") ## get the neighbors of the current node
-            for n in searched:
-                for neighbor in neighbors:
-                    if neighbor[2] == n["node"] and neighbor[0] >= n["weight"]: ## if the neighbor is in searched and has a higher weight than the searched node we can ignore it
-                        neighbors.remove(neighbor)
+            tempNeighbors = neighbors.copy()
+            for neighbor in tempNeighbors:
+                if visited.get(neighbor[2]) is not None and neighbor[0] >= visited[neighbor[2]]: ## if the neighbor is in searched and has a higher weight than the searched node we can ignore it
+                    neighbors.remove(neighbor)
             for n in neighbors: ## for each neighbor                    
                     currentNode = heapq.heappush(unsearched,n)
                     lat1, lon1 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
