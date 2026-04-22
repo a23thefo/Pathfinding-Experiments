@@ -1,6 +1,6 @@
 function initializeMap() {
     // 1. Initialize Leaflet Map (Centered on faroe islands for this example)
-    var map = L.map('map').setView([59.33783990404463, 18.057992157695885], 13);
+    var map = L.map('map').setView([58.389924722868, 13.84619267947129], 13);
 
     // 2. Add a basic visual base layer (Raster tiles for simplicity during setup)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {

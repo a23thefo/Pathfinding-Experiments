@@ -113,11 +113,9 @@ def biDijkstra(graph, startNode, goalNode):
 
 def pathfinderBiDjikstra(node, currentNode, searchedList, bestPath, bestPathNode, pathsFound=0):
     bestPathFound = False
-    print("current node: ", currentNode, "node in other search: ", node)
     if node: ## if the current node is in the other search we have found a path
         ##os.system('clear')
         pathsFound += 1
-        print("Paths found so far: ", pathsFound, "Current best path: ", bestPath, "km")
         if node + currentNode[0] < bestPath: ## if the path we have found is better than the best path we have found so far we update the best path
             searchedList.append({"weight":currentNode[0],"parent":currentNode[1],"node":currentNode[2]})
             bestPath = node + currentNode[0]
@@ -167,6 +165,7 @@ def aStar(graph, startNode, goalNode):
                 path.append(currentNode["node"])
                 currentNode = [s for s in searched if s["node"] == currentNode["parent"]][0]
             print("found path")
+            print(len(visited))
             return path, searchHistory
         else:
             searched.append({"weight":currentNode[0],"parent":currentNode[1],"node":currentNode[2]})
@@ -279,11 +278,66 @@ class RoutingGraphHandler(osmium.SimpleHandler):
                 except osmium.InvalidLocationError:
                     continue # Skip if node location is missing
 
+def compress_data(graph, nodes, edges):
+    simplified_nodes = []
+    removed_nodes = set()
+    nodesKey = dict()
+    simplified_edges = []
+    newId = 0
+    for n in nodes:
+        neighbors = getNeighbors(graph, n)
+        print("Node ", n, " has neighbors: ", len(neighbors))
+        if len(neighbors) == 2: # If the node has exactly 2 neighbors, we can skip it and connect its neighbors directly
+            removed_nodes.add(n)
+            print("Removing node ", n, " and connecting its neighbors directly")
+            continue
+        nodesKey[n] = newId
+        simplified_nodes.append([round(nodes[n]['lat'], 3), round(nodes[n]['lon'], 3)])# Round to 5 decimal places (~1.1m precision)
+        newId += 1
+    for u in edges:
+        if u[0] in removed_nodes or u[1] in removed_nodes:
+            checked_nodes = []
+            currentNode1, currentNode2 = u[0], u[1]
+            validNode1, validNode2 = None, None
+            while validNode1 is None and validNode2 is None:
+                if currentNode1 in removed_nodes:
+                    checked_nodes.append(currentNode1)
+                    n = getNeighbors(graph, currentNode1)
+                    print("number of negihbors: ", len(n))
+                    old = currentNode1
+                    for neighbor in n:
+                        if neighbor[2] != currentNode1 and neighbor[2] not in checked_nodes:
+                            currentNode1 = neighbor[2]
+                            break
+                    if old == currentNode1: # If we looped back to the same node, it means we can't find a valid node in this direction
+                        print("Couldn't find valid node for edge: ", u)
+                        break
+                else:
+                    validNode1 = currentNode1
+                if currentNode2 in removed_nodes:
+                    checked_nodes.append(currentNode2)
+                    n = getNeighbors(graph, currentNode2)
+                    old = currentNode2
+                    for neighbor in n:
+                        if neighbor[2] != currentNode2 and neighbor[2] not in checked_nodes:
+                            currentNode2 = neighbor[2]
+                            break
+                    if old == currentNode2: # If we looped back to the same node, it means we can't find a valid node in this direction
+                        print("Couldn't find valid node for edge: ", u)
+                        break
+                else:
+                    validNode2 = currentNode2
+            if validNode1 is not None and validNode2 is not None:
+                simplified_edges.append([nodesKey.get(validNode1), nodesKey.get(validNode2)])  
+            continue
+        simplified_edges.append([nodesKey.get(u[0]), nodesKey.get(u[1])])
+    return simplified_nodes, simplified_edges
+
 # --- 2. BUILD THE GRAPH & KD-TREE ON STARTUP ---
 print("Parsing OSM data and building graph... (This takes a moment)")
 handler = RoutingGraphHandler()
 # locations=True tells osmium to cache node coordinates so ways can access them
-handler.apply_file("ireland-and-northern-ireland.osm.pbf", locations=True)
+handler.apply_file("map.osm", locations=True)
 graph = handler.graph
 
 # Build a KD-Tree so we can quickly snap map clicks to the nearest valid road node
@@ -294,18 +348,12 @@ for n in node_ids:
     coordinates.append([graph.nodes[n]['lat'], graph.nodes[n]['lon']])
 kdtree = KDTree(coordinates)
 print("Spatial index (KD-Tree) ready!")
+simplified_nodes, simplified_edges = compress_data(graph, graph.nodes, graph.edges)
+print("Nodes:", simplified_nodes)
+print("Edges:", simplified_edges)
 # --- 3. THE ROUTING ENDPOINT ---
 @app.get("/route")
 async def calculate_route(start_lat: float, start_lon: float, end_lat: float, end_lon: float, algorithm: str = "aStar"):
-    all_variables = dir()
-
-    # Iterate over the whole list where dir( )
-    # is stored.
-    for name in all_variables:
-        # Print the item if it doesn't start with '__'
-        if not name.startswith('__'):
-            myvalue = eval(name)
-            print(name, "is", type(myvalue), "and is equal to ", myvalue)
     # 1. Snap the user's clicks to the nearest actual nodes in our graph
     _, start_idx = kdtree.query([start_lat, start_lon])
     _, end_idx = kdtree.query([end_lat, end_lon])
