@@ -286,10 +286,8 @@ def compress_data(graph, nodes, edges):
     newId = 0
     for n in nodes:
         neighbors = getNeighbors(graph, n)
-        print("Node ", n, " has neighbors: ", len(neighbors))
         if len(neighbors) == 2: # If the node has exactly 2 neighbors, we can skip it and connect its neighbors directly
             removed_nodes.add(n)
-            print("Removing node ", n, " and connecting its neighbors directly")
             continue
         nodesKey[n] = newId
         simplified_nodes.append([round(nodes[n]['lat'], 3), round(nodes[n]['lon'], 3)])# Round to 5 decimal places (~1.1m precision)
@@ -300,10 +298,10 @@ def compress_data(graph, nodes, edges):
             currentNode1, currentNode2 = u[0], u[1]
             validNode1, validNode2 = None, None
             while validNode1 is None and validNode2 is None:
+                checked_nodes.append(currentNode1)
+                checked_nodes.append(currentNode2)  
                 if currentNode1 in removed_nodes:
-                    checked_nodes.append(currentNode1)
                     n = getNeighbors(graph, currentNode1)
-                    print("number of negihbors: ", len(n))
                     old = currentNode1
                     for neighbor in n:
                         if neighbor[2] != currentNode1 and neighbor[2] not in checked_nodes:
@@ -311,11 +309,11 @@ def compress_data(graph, nodes, edges):
                             break
                     if old == currentNode1: # If we looped back to the same node, it means we can't find a valid node in this direction
                         print("Couldn't find valid node for edge: ", u)
+                        print("Checked nodes: ", checked_nodes)
                         break
                 else:
                     validNode1 = currentNode1
                 if currentNode2 in removed_nodes:
-                    checked_nodes.append(currentNode2)
                     n = getNeighbors(graph, currentNode2)
                     old = currentNode2
                     for neighbor in n:
@@ -350,7 +348,7 @@ kdtree = KDTree(coordinates)
 print("Spatial index (KD-Tree) ready!")
 simplified_nodes, simplified_edges = compress_data(graph, graph.nodes, graph.edges)
 print("Nodes:", simplified_nodes)
-print("Edges:", simplified_edges)
+print("Paths:", simplified_edges)
 # --- 3. THE ROUTING ENDPOINT ---
 @app.get("/route")
 async def calculate_route(start_lat: float, start_lon: float, end_lat: float, end_lon: float, algorithm: str = "aStar"):
