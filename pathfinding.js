@@ -59,7 +59,7 @@ function initializeMap() {
                     // Pause for 5 milliseconds before drawing the next road.
                     // (Decrease this number if the animation is too slow!)
                     if (sleepcounter > sleeptimer) {
-                        await sleep(0.5);
+                        await sleep(200);
                         sleepcounter = 0;
                         sleeptimer = sleeptimer * 1.05;
                     }
@@ -82,7 +82,7 @@ function initializeMap() {
                     // Pause for 5 milliseconds before drawing the next road.
                     // (Decrease this number if the animation is too slow!)
                     if (sleepcounter > sleeptimer) {
-                        await sleep(0.5);
+                        await sleep(200);
                         sleepcounter = 0;
                         sleeptimer = sleeptimer * 1.05;
                     }

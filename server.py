@@ -7,6 +7,7 @@ import networkx as nx
 import math
 import heapq
 import requests
+import time
 from scipy.spatial import KDTree
 
 app = FastAPI()
@@ -61,7 +62,7 @@ def biDijkstra(graph, startNode, goalNode):
         if unsearchedSearch1 == [] or unsearchedSearch2 == []: ## if unsearched is empty there is no path
             print("No path found")
             searching = False
-            return [], searchHistory
+            return [], searchHistory, len(searched1Visited)+len(searched2Visited)
         currentNodeSearch1 = heapq.heappop(unsearchedSearch1) ## get the node with the lowest weight
         currentNodeSearch2 = heapq.heappop(unsearchedSearch2) ## get the node with the lowest weight
         neighbor1, neighbor2 = None, None
@@ -73,7 +74,7 @@ def biDijkstra(graph, startNode, goalNode):
         if bestPathFound:
             searching = False
             print("Found the goal node!")
-            return pathRenderBiDjikstra(searched1, searched2, bestPathNode, startNode, goalNode), searchHistory
+            return pathRenderBiDjikstra(searched1, searched2, bestPathNode, startNode, goalNode), searchHistory, len(searched1Visited)+len(searched2Visited)
         tempNeighbor1 = neighbor1.copy() if neighbor1 else None
         if(neighbor1):
             for neighbor in neighbor1:
@@ -93,7 +94,7 @@ def biDijkstra(graph, startNode, goalNode):
         if bestPathFound:
             searching = False
             print("Found the goal node!")
-            return pathRenderBiDjikstra(searched1, searched2, bestPathNode, startNode, goalNode), searchHistory
+            return pathRenderBiDjikstra(searched1, searched2, bestPathNode, startNode, goalNode), searchHistory, len(searched1Visited)+len(searched2Visited)
         tempNeighbor2 = neighbor2.copy() if neighbor2 else None
         if(neighbor2):
             for neighbor in neighbor2:
@@ -155,7 +156,7 @@ def aStar(graph, startNode, goalNode):
     while searching:
         if unsearched == []:
             print("No path found")
-            return []
+            return [], None ,len(searched)
         currentNode = heapq.heappop(unsearched)
         if currentNode[2] == goalNode:
             searching = False
@@ -166,7 +167,7 @@ def aStar(graph, startNode, goalNode):
                 currentNode = [s for s in searched if s["node"] == currentNode["parent"]][0]
             print("found path")
             print(len(visited))
-            return path, searchHistory
+            return path, searchHistory, len(searched)
         else:
             searched.append({"weight":currentNode[0],"parent":currentNode[1],"node":currentNode[2]})
             visited[currentNode[2]] = currentNode[0]
@@ -214,11 +215,22 @@ def greedBestFirst(graph, startNode, goalNode):
                     lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
                     searchHistory.append([[lat1, lon1], [lat2, lon2]])
 
-async def LLMAStar(graph, startNode, goalNode):
+async def LLMAStar(graph, startNode, goalNode, nodes, edges):
     print("we in")
     url = "http://127.0.0.1:1234/api/v1/chat"
     data = {
-        "model": "llama-2-13b-chat", "input": f"Using these nodes for routing {graph.nodes} find a path from {startNode} to {goalNode}", "context_length": 16000
+        "model": "meta-llama-3.1-8b-instruct", 
+        "input": f"""You are an expert pathfinding AI. Your task is to find a list of nodes that 100% are apart of the shortest path between two nodes. Like a list of checkpoints.
+        Data Context: Here is the graph data you will use.
+        * Nodes: This list contains the coordinates for each node. The index of the coordinate in this list represents the Node ID (starting at 0).
+        * Paths: This list contains pairs of connected Node IDs. You can ONLY travel between nodes if their IDs appear together in one of these pairs.
+        Nodes: {nodes}
+        Paths: {edges}
+        Task: Find a list of checkpoints from Node 1 to Node 13.
+        Instructions:
+        1. Think Step-by-Step: First, look at the starting node. Search the Paths list for any pairs containing that node to see your available next steps.
+        2. Explain Your Reasoning: Describe your search process and how you arrive at each conclusion before giving the final answer.
+        3. Final Output Format: At the very end of your response, output the final path as a strict Python list of Node IDs in order.""", "context_length": 4000
     }
     headers = {"Content-Type": "application/json", "Authorization": "Bearer sk-lm-NiFOETAj:og35tLR1RpwDZdHaB52p"}
     response = requests.post(url, json=data, headers=headers)
@@ -347,8 +359,6 @@ for n in node_ids:
 kdtree = KDTree(coordinates)
 print("Spatial index (KD-Tree) ready!")
 simplified_nodes, simplified_edges = compress_data(graph, graph.nodes, graph.edges)
-print("Nodes:", simplified_nodes)
-print("Paths:", simplified_edges)
 # --- 3. THE ROUTING ENDPOINT ---
 @app.get("/route")
 async def calculate_route(start_lat: float, start_lon: float, end_lat: float, end_lon: float, algorithm: str = "aStar"):
@@ -358,11 +368,23 @@ async def calculate_route(start_lat: float, start_lon: float, end_lat: float, en
     
     start_node = node_ids[start_idx]
     end_node = node_ids[end_idx]
+
+    visited_nodes = 0
+
+    start_time = time.perf_counter()
+
     # Unpack the two returned variables
     if(algorithm == "LLMAStar"):
-        path_node_ids, search_history = await LLMAStar(graph, start_node, end_node)
+        path_node_ids, search_history = await LLMAStar(graph, start_node, end_node, simplified_nodes, simplified_edges)
     else:
-        path_node_ids, search_history = eval(algorithm)(graph, start_node, end_node)
+        path_node_ids, search_history, visited_nodes = eval(algorithm)(graph, start_node, end_node)
+    
+    end_time = time.perf_counter()
+
+    if ((end_time - start_time) > 60 ):
+        print((end_time - start_time)/60,"minutes")
+    else:
+        print(end_time - start_time, ",", visited_nodes)
 
     if path_node_ids == []:
         return {"error": "No path found"}
