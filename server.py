@@ -215,8 +215,32 @@ def greedBestFirst(graph, startNode, goalNode):
                     lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
                     searchHistory.append([[lat1, lon1], [lat2, lon2]])
 
-async def LLMAStar(graph, startNode, goalNode, nodes, edges):
+async def LLMAStar(graph, startNode, goalNode, nodes, edges, key, removedFromSimplified):
     print("we in")
+    nodes.append(graph.nodes[startNode])
+    nodes.append(graph.nodes[goalNode])
+    key[startNode] = len(nodes)-2
+    key[goalNode] = len(nodes)-1
+    if startNode in removedFromSimplified:
+        removedFromSimplified.remove(startNode)
+    if goalNode in removedFromSimplified:
+        removedFromSimplified.remove(goalNode)
+
+    for n in getNeighbors(graph, startNode):
+        if(n[2] in removedFromSimplified):
+            newEdge = compress_edge(startNode, n[2], removedFromSimplified, graph, key)
+            if newEdge:
+                edges.append(newEdge)
+        else:
+            edges.append([key.get(startNode), key.get(n[2])])
+    for n in getNeighbors(graph, goalNode):
+        if(n[2] in removedFromSimplified):
+            newEdge = compress_edge(goalNode, n[2], removedFromSimplified, graph, key)
+            if newEdge:
+                edges.append(newEdge)
+        else:
+            edges.append([key.get(goalNode), key.get(n[2])])
+
     url = "http://127.0.0.1:1234/api/v1/chat"
     data = {
         "model": "meta-llama-3.1-8b-instruct", 
@@ -226,15 +250,16 @@ async def LLMAStar(graph, startNode, goalNode, nodes, edges):
         * Paths: This list contains pairs of connected Node IDs. You can ONLY travel between nodes if their IDs appear together in one of these pairs.
         Nodes: {nodes}
         Paths: {edges}
-        Task: Find a list of checkpoints from Node 1 to Node 13.
+        Task: Find a list of checkpoints from {key.get(startNode)} to {key.get(goalNode)}.
         Instructions:
         1. Think Step-by-Step: First, look at the starting node. Search the Paths list for any pairs containing that node to see your available next steps.
         2. Explain Your Reasoning: Describe your search process and how you arrive at each conclusion before giving the final answer.
         3. Final Output Format: At the very end of your response, output the final path as a strict Python list of Node IDs in order.""", "context_length": 4000
     }
+    print("Sending request to LLM with data:", data)
     headers = {"Content-Type": "application/json", "Authorization": "Bearer sk-lm-NiFOETAj:og35tLR1RpwDZdHaB52p"}
     response = requests.post(url, json=data, headers=headers)
-    print("LLM response:", response.json())
+    print("LLM response:", response.json().get("output"))
     # This is a placeholder for the LLM-augmented A* algorithm. You can implement it similarly to the regular A* but with an additional heuristic component that queries an LLM for guidance.
     return [], []
 
@@ -306,42 +331,47 @@ def compress_data(graph, nodes, edges):
         newId += 1
     for u in edges:
         if u[0] in removed_nodes or u[1] in removed_nodes:
-            checked_nodes = []
-            currentNode1, currentNode2 = u[0], u[1]
-            validNode1, validNode2 = None, None
-            while validNode1 is None and validNode2 is None:
-                checked_nodes.append(currentNode1)
-                checked_nodes.append(currentNode2)  
-                if currentNode1 in removed_nodes:
-                    n = getNeighbors(graph, currentNode1)
-                    old = currentNode1
-                    for neighbor in n:
-                        if neighbor[2] != currentNode1 and neighbor[2] not in checked_nodes:
-                            currentNode1 = neighbor[2]
-                            break
-                    if old == currentNode1: # If we looped back to the same node, it means we can't find a valid node in this direction
-                        print("Couldn't find valid node for edge: ", u)
-                        print("Checked nodes: ", checked_nodes)
-                        break
-                else:
-                    validNode1 = currentNode1
-                if currentNode2 in removed_nodes:
-                    n = getNeighbors(graph, currentNode2)
-                    old = currentNode2
-                    for neighbor in n:
-                        if neighbor[2] != currentNode2 and neighbor[2] not in checked_nodes:
-                            currentNode2 = neighbor[2]
-                            break
-                    if old == currentNode2: # If we looped back to the same node, it means we can't find a valid node in this direction
-                        print("Couldn't find valid node for edge: ", u)
-                        break
-                else:
-                    validNode2 = currentNode2
-            if validNode1 is not None and validNode2 is not None:
-                simplified_edges.append([nodesKey.get(validNode1), nodesKey.get(validNode2)])  
-            continue
-        simplified_edges.append([nodesKey.get(u[0]), nodesKey.get(u[1])])
-    return simplified_nodes, simplified_edges
+            compressed_edge = compress_edge(u[0], u[1], removed_nodes, graph, nodesKey)
+            if compressed_edge:
+                simplified_edges.append(compressed_edge)
+        else:
+            simplified_edges.append([nodesKey.get(u[0]), nodesKey.get(u[1])])
+    return simplified_nodes, simplified_edges, nodesKey, removed_nodes
+
+def compress_edge(mode1,node2, removed_nodes, graph, nodesKey):
+    checked_nodes = []
+    currentNode1, currentNode2 = mode1, node2
+    validNode1, validNode2 = None, None
+    while validNode1 is None and validNode2 is None:
+        checked_nodes.append(currentNode1)
+        checked_nodes.append(currentNode2)  
+        if currentNode1 in removed_nodes:
+            n = getNeighbors(graph, currentNode1)
+            old = currentNode1
+            for neighbor in n:
+                if neighbor[2] != currentNode1 and neighbor[2] not in checked_nodes:
+                    currentNode1 = neighbor[2]
+                    break
+            if old == currentNode1: # If we looped back to the same node, it means we can't find a valid node in this direction
+                print("Couldn't find valid node for edge: ", mode1, node2)
+                print("Checked nodes: ", checked_nodes)
+                break
+        else:
+            validNode1 = currentNode1
+        if currentNode2 in removed_nodes:
+            n = getNeighbors(graph, currentNode2)
+            old = currentNode2
+            for neighbor in n:
+                if neighbor[2] != currentNode2 and neighbor[2] not in checked_nodes:
+                    currentNode2 = neighbor[2]
+                    break
+            if old == currentNode2: # If we looped back to the same node, it means we can't find a valid node in this direction
+                print("Couldn't find valid node for edge: ", mode1, node2)
+                break
+        else:
+            validNode2 = currentNode2
+    if validNode1 is not None and validNode2 is not None:
+        return [nodesKey.get(validNode1), nodesKey.get(validNode2)]
 
 # --- 2. BUILD THE GRAPH & KD-TREE ON STARTUP ---
 print("Parsing OSM data and building graph... (This takes a moment)")
@@ -358,7 +388,7 @@ for n in node_ids:
     coordinates.append([graph.nodes[n]['lat'], graph.nodes[n]['lon']])
 kdtree = KDTree(coordinates)
 print("Spatial index (KD-Tree) ready!")
-simplified_nodes, simplified_edges = compress_data(graph, graph.nodes, graph.edges)
+simplified_nodes, simplified_edges, nodesKey, removedFromSimplified = compress_data(graph, graph.nodes, graph.edges)
 # --- 3. THE ROUTING ENDPOINT ---
 @app.get("/route")
 async def calculate_route(start_lat: float, start_lon: float, end_lat: float, end_lon: float, algorithm: str = "aStar"):
@@ -375,7 +405,7 @@ async def calculate_route(start_lat: float, start_lon: float, end_lat: float, en
 
     # Unpack the two returned variables
     if(algorithm == "LLMAStar"):
-        path_node_ids, search_history = await LLMAStar(graph, start_node, end_node, simplified_nodes, simplified_edges)
+        path_node_ids, search_history = await LLMAStar(graph, start_node, end_node, simplified_nodes, simplified_edges, nodesKey, removedFromSimplified)
     else:
         path_node_ids, search_history, visited_nodes = eval(algorithm)(graph, start_node, end_node)
     
