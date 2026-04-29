@@ -178,7 +178,7 @@ def aStar(graph, startNode, goalNode):
                 if visited.get(neighbor[2]) is not None and neighbor[0] >= visited[neighbor[2]]: ## if the neighbor is in searched and has a higher weight than the searched node we can ignore it
                     neighbors.remove(neighbor)
             for n in neighbors: ## for each neighbor                    
-                    currentNode = heapq.heappush(unsearched,n)
+                    heapq.heappush(unsearched,n)
                     lat1, lon1 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
                     lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
                     searchHistory.append([[lat1, lon1], [lat2, lon2]])
@@ -315,8 +315,6 @@ def getNeighbors(graph, parent, currentCost=0, goalNode=None, heuristic=None):
             weight = calculate_distance(graph.nodes[n]['lat'], graph.nodes[n]['lon'], graph.nodes[parent]['lat'], graph.nodes[parent]['lon'])
         else:
             weight = calculate_distance(graph.nodes[n]['lat'], graph.nodes[n]['lon'], graph.nodes[goalNode]['lat'], graph.nodes[goalNode]['lon'])
-        if heuristic == "aStar":  
-            weight += calculate_distance(graph.nodes[n]['lat'], graph.nodes[n]['lon'], graph.nodes[goalNode]['lat'], graph.nodes[goalNode]['lon'])
         heapq.heappush(neighbors,(weight+currentCost,parent,n))
     return neighbors
 
