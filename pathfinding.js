@@ -86,8 +86,7 @@ function initializeMap() {
                         sleepcounter = 0;
                         sleeptimer = sleeptimer * 1.05;
                     }
-                }
-                
+                } 
             }else { 
                 for (let roadCoords of data.search_history) {
                     sleepcounter++;
@@ -120,7 +119,16 @@ function initializeMap() {
             }).addTo(map);
             
             drawnLayers.push(finalRouteLayer);
-            
+
+            if (data.checkpoints) {
+                for (let roadCoords of data.checkpoints) {
+                    let checkpointMarker = L.circleMarker(roadCoords, {
+                        color: 'green',
+                        radius: 8,
+                    }).addTo(map);
+                    drawnLayers.push(checkpointMarker);
+                } 
+            } 
             // Reset clicks for the next attempt
             clicks = []; 
         }

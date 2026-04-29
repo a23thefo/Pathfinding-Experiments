@@ -156,19 +156,18 @@ def aStar(graph, startNode, goalNode):
     while searching:
         if unsearched == []:
             print("No path found")
-            return [], None ,len(searched)
+            return [], searchHistory ,len(searched)
         currentNode = heapq.heappop(unsearched)
         if currentNode[2] == goalNode:
             searching = False
             currentNode = {"weight":currentNode[0],"parent":currentNode[1],"node":currentNode[2]}
+            searchHistory.append([[graph.nodes[currentNode["node"]]['lat'], graph.nodes[currentNode["node"]]['lon']], [graph.nodes[currentNode["parent"]]['lat'], graph.nodes[currentNode["parent"]]['lon']]])
+            searched.append(currentNode)
             print("Found the goal node!")
             while currentNode["node"] != startNode:
                 path.append(currentNode["node"])
                 currentNode = [s for s in searched if s["node"] == currentNode["parent"]][0]
             print("found path")
-            print(len(searched))
-            print(path[::-1])
-            print(searchHistory)
             return path[::-1], searchHistory, len(searched)
         else:
             searched.append({"weight":currentNode[0],"parent":currentNode[1],"node":currentNode[2]})
@@ -183,6 +182,7 @@ def aStar(graph, startNode, goalNode):
                     lat1, lon1 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
                     lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
                     searchHistory.append([[lat1, lon1], [lat2, lon2]])
+    print("nothin")
 
 def greedBestFirst(graph, startNode, goalNode):
     searching = True
@@ -193,7 +193,7 @@ def greedBestFirst(graph, startNode, goalNode):
     while searching:
         if unsearched == []:
             print("No path found")
-            return []
+            return [], searchHistory, len(searched)
         currentNode = heapq.heappop(unsearched)
         if currentNode[2] == goalNode:
             searching = False
@@ -230,11 +230,9 @@ async def LLMAStar(graph, startNode, goalNode, nodes, edges, key, removedFromSim
     for n in getNeighbors(graph, startNode):
         if(n[2] in removedFromSimplified):
             newEdge = compress_edge(startNode, n[2], removedFromSimplified, graph, key)
-            print("new edge: ", newEdge)
             if newEdge:
                 edges.append(newEdge)
         else:
-            print("edge: ", key.get(startNode), "->", key.get(n[2]))
             edges.append([key.get(startNode), key.get(n[2])])
     for n in getNeighbors(graph, goalNode):
         if(n[2] in removedFromSimplified):
@@ -271,35 +269,43 @@ async def LLMAStar(graph, startNode, goalNode, nodes, edges, key, removedFromSim
     headers = {"Content-Type": "application/json", "Authorization": "Bearer sk-lm-NiFOETAj:og35tLR1RpwDZdHaB52p"}
     response = requests.post(url, json=data, headers=headers)
     check = response.json().get("output")[0].get("content").split("[")[-1].split("]")[0].rsplit(",")
-    print("LLM response:", check)
+    print(check)
     checkpoints = [int(x.strip()) for x in check if x.strip().isdigit()]
-    print("Parsed checkpoints: ", checkpoints)
     checks = []
+    checkpointCords = []
+
     for c in checkpoints:
         if c not in key.values():
             print("Invalid checkpoint from LLM, not in graph: ", c)
             continue
         for idNode in key:
-            if key[idNode] == c:
+            if key[idNode] == c and idNode not in [startNode, goalNode]:
                 checks.append(idNode)
-    path = []
+    for c in checks:
+        checkpointCords.append([graph.nodes[c]['lat'], graph.nodes[c]['lon']])
+    print(checkpointCords)
+    checks.append(goalNode)
+    path = [startNode]
     history = []
     searched = 0
+
+    print("LLM Checkpoints (Node IDs): ", checks)
     for c in checks:
-        if c == startNode:
-            continue
-        elif c == goalNode:
-            pathTemp, historyTemp, searchedTemp = aStar(graph, path[-1], goalNode)[0]
-            path.append(pathTemp)
-            history.append(historyTemp)
+        if c == goalNode:
+            pathTemp, historyTemp, searchedTemp = aStar(graph, path[-1], goalNode)
+            for h in pathTemp:
+                path.append(h)
+            for h in historyTemp:
+                history.append(h)
             searched += searchedTemp
         else:
-            pathTemp, historyTemp, searchedTemp = aStar(graph, path[-1] if path else startNode, c)[0]
-            path.append(pathTemp)
-            history.append(historyTemp)
+            pathTemp, historyTemp, searchedTemp = aStar(graph, path[-1], c)
+            for h in pathTemp:
+                path.append(h)
+            for h in historyTemp:
+                history.append(h)
             searched += searchedTemp
-        print("Valid checkpoint from LLM: ", c)
-    return path, history, searched
+    return path, history, searched, checkpointCords
 
 def getNeighbors(graph, parent, currentCost=0, goalNode=None, heuristic=None):
     neighbors = []
@@ -440,10 +446,11 @@ async def calculate_route(start_lat: float, start_lon: float, end_lat: float, en
     visited_nodes = 0
 
     start_time = time.perf_counter()
+    checkpoints = []
 
     # Unpack the two returned variables
     if(algorithm == "LLMAStar"):
-        path_node_ids, search_history, visited_nodes = await LLMAStar(graph, start_node, end_node, simplified_nodes, simplified_edges, nodesKey, removedFromSimplified)
+        path_node_ids, search_history, visited_nodes, checkpoints = await LLMAStar(graph, start_node, end_node, simplified_nodes, simplified_edges, nodesKey, removedFromSimplified)
     else:
         path_node_ids, search_history, visited_nodes = eval(algorithm)(graph, start_node, end_node)
     
@@ -468,6 +475,7 @@ async def calculate_route(start_lat: float, start_lon: float, end_lat: float, en
                 "coordinates": route_coords
             }
         },
-        "search_history": search_history # Send the history to the frontend!
+        "search_history": search_history, # Send the history to the frontend!
+        "checkpoints": checkpoints
     }
 
