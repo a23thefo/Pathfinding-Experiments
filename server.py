@@ -166,8 +166,10 @@ def aStar(graph, startNode, goalNode):
                 path.append(currentNode["node"])
                 currentNode = [s for s in searched if s["node"] == currentNode["parent"]][0]
             print("found path")
-            print(len(visited))
-            return path, searchHistory, len(searched)
+            print(len(searched))
+            print(path[::-1])
+            print(searchHistory)
+            return path[::-1], searchHistory, len(searched)
         else:
             searched.append({"weight":currentNode[0],"parent":currentNode[1],"node":currentNode[2]})
             visited[currentNode[2]] = currentNode[0]
@@ -225,13 +227,14 @@ async def LLMAStar(graph, startNode, goalNode, nodes, edges, key, removedFromSim
         removedFromSimplified.remove(startNode)
     if goalNode in removedFromSimplified:
         removedFromSimplified.remove(goalNode)
-
     for n in getNeighbors(graph, startNode):
         if(n[2] in removedFromSimplified):
             newEdge = compress_edge(startNode, n[2], removedFromSimplified, graph, key)
+            print("new edge: ", newEdge)
             if newEdge:
                 edges.append(newEdge)
         else:
+            print("edge: ", key.get(startNode), "->", key.get(n[2]))
             edges.append([key.get(startNode), key.get(n[2])])
     for n in getNeighbors(graph, goalNode):
         if(n[2] in removedFromSimplified):
@@ -244,7 +247,8 @@ async def LLMAStar(graph, startNode, goalNode, nodes, edges, key, removedFromSim
     url = "http://127.0.0.1:1234/api/v1/chat"
     data = {
         "model": "meta-llama-3.1-8b-instruct", 
-        "input": f"""You are an expert pathfinding AI. Your task is to find a list of nodes that 100% are apart of the shortest path between two nodes. Like a list of checkpoints.
+        "input": f"""
+        You are an expert pathfinding AI. Your task is to find a list of nodes that 100% are apart of the shortest path between two nodes. Like a list of checkpoints.
         Data Context: Here is the graph data you will use.
         * Nodes: This list contains the coordinates for each node. The index of the coordinate in this list represents the Node ID (starting at 0).
         * Paths: This list contains pairs of connected Node IDs. You can ONLY travel between nodes if their IDs appear together in one of these pairs.
@@ -254,14 +258,48 @@ async def LLMAStar(graph, startNode, goalNode, nodes, edges, key, removedFromSim
         Instructions:
         1. Think Step-by-Step: First, look at the starting node. Search the Paths list for any pairs containing that node to see your available next steps.
         2. Explain Your Reasoning: Describe your search process and how you arrive at each conclusion before giving the final answer.
-        3. Final Output Format: At the very end of your response, output the final path as a strict Python list of Node IDs in order.""", "context_length": 4000
+        3. Final Output Format: At the very end of your response, output the final path as a strict Python list of Node IDs in order.
+        4. Examples of Output format: 
+            * Example 1: Path from node 10 to node 34 = [10, 1, 2, 34]
+            * Example 2: Path from node 2 to node 81 = [2, 1, 10, 9, 62, 81]
+            * Example 3: Path from node 55 to node 54 = [] Beacause there is no path between these two nodes.
+            * Example 4: Path from node 3 to node 1 = [3, 4, 5, 6, 51, 2, 1]
+            * Example 5: Path from node 67 to node 69 = [67, 18, 28, 29, 69]
+        """, "context_length": 4000
     }
-    print("Sending request to LLM with data:", data)
+    print(data["input"])
     headers = {"Content-Type": "application/json", "Authorization": "Bearer sk-lm-NiFOETAj:og35tLR1RpwDZdHaB52p"}
     response = requests.post(url, json=data, headers=headers)
-    print("LLM response:", response.json().get("output"))
-    # This is a placeholder for the LLM-augmented A* algorithm. You can implement it similarly to the regular A* but with an additional heuristic component that queries an LLM for guidance.
-    return [], []
+    check = response.json().get("output")[0].get("content").split("[")[-1].split("]")[0].rsplit(",")
+    print("LLM response:", check)
+    checkpoints = [int(x.strip()) for x in check if x.strip().isdigit()]
+    print("Parsed checkpoints: ", checkpoints)
+    checks = []
+    for c in checkpoints:
+        if c not in key.values():
+            print("Invalid checkpoint from LLM, not in graph: ", c)
+            continue
+        for idNode in key:
+            if key[idNode] == c:
+                checks.append(idNode)
+    path = []
+    history = []
+    searched = 0
+    for c in checks:
+        if c == startNode:
+            continue
+        elif c == goalNode:
+            pathTemp, historyTemp, searchedTemp = aStar(graph, path[-1], goalNode)[0]
+            path.append(pathTemp)
+            history.append(historyTemp)
+            searched += searchedTemp
+        else:
+            pathTemp, historyTemp, searchedTemp = aStar(graph, path[-1] if path else startNode, c)[0]
+            path.append(pathTemp)
+            history.append(historyTemp)
+            searched += searchedTemp
+        print("Valid checkpoint from LLM: ", c)
+    return path, history, searched
 
 def getNeighbors(graph, parent, currentCost=0, goalNode=None, heuristic=None):
     neighbors = []
@@ -338,11 +376,11 @@ def compress_data(graph, nodes, edges):
             simplified_edges.append([nodesKey.get(u[0]), nodesKey.get(u[1])])
     return simplified_nodes, simplified_edges, nodesKey, removed_nodes
 
-def compress_edge(mode1,node2, removed_nodes, graph, nodesKey):
+def compress_edge(node1, node2, removed_nodes, graph, nodesKey):
     checked_nodes = []
-    currentNode1, currentNode2 = mode1, node2
+    currentNode1, currentNode2 = node1, node2
     validNode1, validNode2 = None, None
-    while validNode1 is None and validNode2 is None:
+    while validNode1 is None or validNode2 is None:
         checked_nodes.append(currentNode1)
         checked_nodes.append(currentNode2)  
         if currentNode1 in removed_nodes:
@@ -353,7 +391,7 @@ def compress_edge(mode1,node2, removed_nodes, graph, nodesKey):
                     currentNode1 = neighbor[2]
                     break
             if old == currentNode1: # If we looped back to the same node, it means we can't find a valid node in this direction
-                print("Couldn't find valid node for edge: ", mode1, node2)
+                print("Couldn't find valid node for edge: ", node1, node2)
                 print("Checked nodes: ", checked_nodes)
                 break
         else:
@@ -366,7 +404,7 @@ def compress_edge(mode1,node2, removed_nodes, graph, nodesKey):
                     currentNode2 = neighbor[2]
                     break
             if old == currentNode2: # If we looped back to the same node, it means we can't find a valid node in this direction
-                print("Couldn't find valid node for edge: ", mode1, node2)
+                print("Couldn't find valid node for edge: ", node1, node2)
                 break
         else:
             validNode2 = currentNode2
@@ -405,7 +443,7 @@ async def calculate_route(start_lat: float, start_lon: float, end_lat: float, en
 
     # Unpack the two returned variables
     if(algorithm == "LLMAStar"):
-        path_node_ids, search_history = await LLMAStar(graph, start_node, end_node, simplified_nodes, simplified_edges, nodesKey, removedFromSimplified)
+        path_node_ids, search_history, visited_nodes = await LLMAStar(graph, start_node, end_node, simplified_nodes, simplified_edges, nodesKey, removedFromSimplified)
     else:
         path_node_ids, search_history, visited_nodes = eval(algorithm)(graph, start_node, end_node)
     
