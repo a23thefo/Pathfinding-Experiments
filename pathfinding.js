@@ -40,7 +40,7 @@ function initializeMap() {
             // 1. ANIMATE THE SEARCH HISTORY
             // We draw the roads the algorithm checked in a light red color
             let sleepcounter = 0;
-            let sleeptimer = 100;
+            let sleeptimer = 1;
             if (algorithm === "biDijkstra") {
                 console.log("Drawing search history for bidirectional search:", data.search_history);
                 for (let roadCoords of data.search_history["search1"]) {
@@ -61,7 +61,7 @@ function initializeMap() {
                     if (sleepcounter > sleeptimer) {
                         await sleep(200);
                         sleepcounter = 0;
-                        sleeptimer = sleeptimer * 1.05;
+                        //sleeptimer = sleeptimer * 1.05;
                     }
                 }
                 sleepcounter = 0;
@@ -84,7 +84,7 @@ function initializeMap() {
                     if (sleepcounter > sleeptimer) {
                         await sleep(200);
                         sleepcounter = 0;
-                        sleeptimer = sleeptimer * 1.05;
+                        //sleeptimer = sleeptimer * 1.05;
                     }
                 } 
             }else { 
@@ -106,7 +106,7 @@ function initializeMap() {
                     if (sleepcounter > sleeptimer) {
                         await sleep(0.5);
                         sleepcounter = 0;
-                        sleeptimer = sleeptimer * 1.05; // Gradually increase the sleep time to slow down the animation as it progresses
+                        //sleeptimer = sleeptimer * 1.05; // Gradually increase the sleep time to slow down the animation as it progresses
                     }
                 };
             }

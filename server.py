@@ -313,8 +313,9 @@ def getNeighbors(graph, parent, currentCost=0, goalNode=None, heuristic=None):
     for n in graph.neighbors(parent):
         if heuristic != "bestFirst":
             weight = calculate_distance(graph.nodes[n]['lat'], graph.nodes[n]['lon'], graph.nodes[parent]['lat'], graph.nodes[parent]['lon'])
-        else:
-            weight = calculate_distance(graph.nodes[n]['lat'], graph.nodes[n]['lon'], graph.nodes[goalNode]['lat'], graph.nodes[goalNode]['lon'])
+        if goalNode is not None:
+            weight += calculate_distance(graph.nodes[n]['lat'], graph.nodes[n]['lon'], graph.nodes[goalNode]['lat'], graph.nodes[goalNode]['lon'])
+        print("currentCost: ", currentCost, " weight: ", weight)
         heapq.heappush(neighbors,(weight+currentCost,parent,n))
     return neighbors
 
