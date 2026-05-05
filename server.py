@@ -455,7 +455,7 @@ async def calculate_route(start_lat: float, start_lon: float, end_lat: float, en
     end_time = time.perf_counter()
 
     if ((end_time - start_time) > 60 ):
-        print((end_time - start_time)/60,"minutes")
+        print((end_time - start_time)/60,"minutes ,", visited_nodes)
     else:
         print(end_time - start_time, ",", visited_nodes)
 
