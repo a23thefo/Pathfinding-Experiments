@@ -1,3 +1,12 @@
+function runBenchmark() {
+    let algorithm = document.getElementById("algorithm").value;
+    fetch(`http://localhost:8000/benchmark?algorithm=${algorithm}&endpoints=10&runs=100`)
+        .then(response => response.json())
+        .then(data => {
+            console.log("Benchmark results:", data);
+        });
+}
+
 function initializeMap() {
     // 1. Initialize Leaflet Map (Centered on faroe islands for this example)
     var map = L.map('map').setView([58.389924722868, 13.84619267947129], 18);
