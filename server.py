@@ -163,11 +163,9 @@ def aStar(graph, startNode, goalNode):
             currentNode = {"weight":currentNode[0],"parent":currentNode[1],"node":currentNode[2]}
             searchHistory.append([[graph.nodes[currentNode["node"]]['lat'], graph.nodes[currentNode["node"]]['lon']], [graph.nodes[currentNode["parent"]]['lat'], graph.nodes[currentNode["parent"]]['lon']]])
             searched.append(currentNode)
-            print("Found the goal node!")
             while currentNode["node"] != startNode:
                 path.append(currentNode["node"])
                 currentNode = [s for s in searched if s["node"] == currentNode["parent"]][0]
-            print("found path")
             return path[::-1], searchHistory, len(searched)
         else:
             searched.append({"weight":currentNode[0],"parent":currentNode[1],"node":currentNode[2]})
@@ -182,7 +180,6 @@ def aStar(graph, startNode, goalNode):
                     lat1, lon1 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
                     lat2, lon2 = graph.nodes[n[2]]['lat'], graph.nodes[n[2]]['lon']
                     searchHistory.append([[lat1, lon1], [lat2, lon2]])
-    print("nothin")
 
 def greedBestFirst(graph, startNode, goalNode):
     searching = True
@@ -218,7 +215,7 @@ def greedBestFirst(graph, startNode, goalNode):
                     searchHistory.append([[lat1, lon1], [lat2, lon2]])
 
 async def LLMAStar(graph, startNode, goalNode, nodes, edges, key, removedFromSimplified):
-    print("we in")
+    invalidCheckpoints = 0
     nodes.append(graph.nodes[startNode])
     nodes.append(graph.nodes[goalNode])
     key[startNode] = len(nodes)-2
@@ -281,13 +278,13 @@ async def LLMAStar(graph, startNode, goalNode, nodes, edges, key, removedFromSim
     for c in checkpoints:
         if c not in key.values():
             print("Invalid checkpoint from LLM, not in graph: ", c)
+            invalidCheckpoints += 1
             continue
         for idNode in key:
             if key[idNode] == c and idNode not in [startNode, goalNode]:
                 checks.append(idNode)
     for c in checks:
         checkpointCords.append([graph.nodes[c]['lat'], graph.nodes[c]['lon']])
-    print(checkpointCords)
     checks.append(goalNode)
     path = [startNode]
     history = []
@@ -295,6 +292,10 @@ async def LLMAStar(graph, startNode, goalNode, nodes, edges, key, removedFromSim
     for c in checks:
         if c == goalNode:
             pathTemp, historyTemp, searchedTemp = aStar(graph, path[-1], goalNode)
+            if pathTemp == []:
+                print("LLM Checkpoint is not actually on the path: ", c)
+                invalidCheckpoints += 1
+                return [], [], searched+searchedTemp, checkpointCords
             for h in pathTemp:
                 path.append(h)
             for h in historyTemp:
@@ -302,6 +303,10 @@ async def LLMAStar(graph, startNode, goalNode, nodes, edges, key, removedFromSim
             searched += searchedTemp
         else:
             pathTemp, historyTemp, searchedTemp = aStar(graph, path[-1], c)
+            if pathTemp == []:
+                print("LLM Checkpoint is not actually on the path: ", c)
+                invalidCheckpoints += 1
+                return [], [], searched+searchedTemp, checkpointCords
             for h in pathTemp:
                 path.append(h)
             for h in historyTemp:
@@ -445,24 +450,29 @@ async def benchmark(algorithm: str = "biDijkstra", endpoints: int = 1, runs: int
             end_idx = int(random() * len(node_ids))
             start_node = node_ids[start_idx]
             end_node = node_ids[end_idx]
-            start_time = time.perf_counter()
+            checkpoints = []
             ram = psutil.virtual_memory()
             start_ram = ram.percent
             start_cpu = psutil.cpu_percent(interval=1)
+            start_time = time.perf_counter()
             if algorithm == "LLMAStar":
                 path_node_ids, search_history, visited_nodes, checkpoints = await LLMAStar(graph, start_node, end_node, simplified_nodes.copy(), simplified_edges.copy(), nodesKey, removedFromSimplified.copy())
             else:
                 path_node_ids, search_history, visited_nodes = eval(algorithm)(graph, start_node, end_node)
+            end_time = time.perf_counter()
             end_ram = ram.percent
             end_cpu = psutil.cpu_percent(interval=1)
-            end_time = time.perf_counter()
             time_taken = end_time - start_time
+            birdDistance = calculate_distance(graph.nodes[start_node]['lat'], graph.nodes[start_node]['lon'], graph.nodes[end_node]['lat'], graph.nodes[end_node]['lon'])  
+            pathLength = 0
+            for j in range(len(path_node_ids)-1):
+                pathLength += calculate_distance(graph.nodes[path_node_ids[j]]['lat'], graph.nodes[path_node_ids[j]]['lon'], graph.nodes[path_node_ids[j+1]]['lat'], graph.nodes[path_node_ids[j+1]]['lon'])
 
             if (path_node_ids == []):
-                data += f"{i+1}:{time_taken:.5f}:NoPath:{start_ram}->{end_ram}:{start_cpu}->{end_cpu} \n "
+                data += f"{i+1}:{time_taken:.5f}:{visited_nodes}:{start_ram}:{end_ram}:{start_cpu}:{end_cpu}:{start_node}:{end_node}:{birdDistance}:{pathLength}:{checkpoints}:NoPath \n "
             else:
-                data += f"{i+1}:{time_taken:.5f}:{visited_nodes}:{start_ram}->{end_ram}:{start_cpu}->{end_cpu} \n "
-        data += "----\n"
+                data += f"{i+1}:{time_taken:.5f}:{visited_nodes}:{start_ram}:{end_ram}:{start_cpu}:{end_cpu}:{start_node}:{end_node}:{birdDistance}:{pathLength}:{checkpoints}:PathFound \n "
+        print(f"Run {i+1}/{runs} for {algorithm} completed.")
     print(data)
     x = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     f = open(f"benchmark_results_{algorithm}_{x}.txt", "x")
