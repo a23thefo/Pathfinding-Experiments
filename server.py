@@ -138,10 +138,13 @@ def pathRenderBiDjikstra(searched1, searched2, bestPathNode, startNode, goalNode
     while currentNode1["node"] != startNode: ## backtrack the path by getting the parent nodes.
         path.append(currentNode1["node"])
         currentNode1 = [s for s in searched1 if s["node"] == currentNode1["parent"]][0]
+    path.append(startNode)
     path.reverse()
     while currentNode2["node"] != goalNode: ## backtrack the path by getting the parent nodes.
         path.append(currentNode2["node"])
         currentNode2 = [s for s in searched2 if s["node"] == currentNode2["parent"]][0]
+    path.append(goalNode)
+    path.reverse()
     return path 
 
 
@@ -215,7 +218,6 @@ def greedBestFirst(graph, startNode, goalNode):
                     searchHistory.append([[lat1, lon1], [lat2, lon2]])
 
 async def LLMAStar(graph, startNode, goalNode, nodes, edges, key, removedFromSimplified):
-    invalidCheckpoints = 0
     nodes.append(graph.nodes[startNode])
     nodes.append(graph.nodes[goalNode])
     key[startNode] = len(nodes)-2
@@ -267,13 +269,14 @@ async def LLMAStar(graph, startNode, goalNode, nodes, edges, key, removedFromSim
     try:
         if response.json().get("error"):
             print("LLM Error: ", response.json().get("error").get("message"))
-            return [], [], 0, []
+            return [], [], 0, [], 0
     except:
         pass
     check = response.json().get("output")[0].get("content").split("[")[-1].split("]")[0].rsplit(",")
     checkpoints = [int(x.strip()) for x in check if x.strip().isdigit()]
     checks = []
     checkpointCords = []
+    invalidCheckpoints = 0
 
     for c in checkpoints:
         if c not in key.values():
@@ -295,7 +298,6 @@ async def LLMAStar(graph, startNode, goalNode, nodes, edges, key, removedFromSim
             if pathTemp == []:
                 print("LLM Checkpoint is not actually on the path: ", c)
                 invalidCheckpoints += 1
-                return [], [], searched+searchedTemp, checkpointCords
             for h in pathTemp:
                 path.append(h)
             for h in historyTemp:
@@ -303,16 +305,15 @@ async def LLMAStar(graph, startNode, goalNode, nodes, edges, key, removedFromSim
             searched += searchedTemp
         else:
             pathTemp, historyTemp, searchedTemp = aStar(graph, path[-1], c)
+            searched += searchedTemp
             if pathTemp == []:
                 print("LLM Checkpoint is not actually on the path: ", c)
                 invalidCheckpoints += 1
-                return [], [], searched+searchedTemp, checkpointCords
             for h in pathTemp:
                 path.append(h)
             for h in historyTemp:
                 history.append(h)
-            searched += searchedTemp
-    return path, history, searched, checkpointCords
+    return path, history, searched, checkpointCords, invalidCheckpoints
 
 def getNeighbors(graph, parent, currentCost=0, goalNode=None, heuristic=None):
     neighbors = []
@@ -451,12 +452,13 @@ async def benchmark(algorithm: str = "biDijkstra", endpoints: int = 1, runs: int
             start_node = node_ids[start_idx]
             end_node = node_ids[end_idx]
             checkpoints = []
+            invalidCheckpoints = 0
             ram = psutil.virtual_memory()
             start_ram = ram.percent
             start_cpu = psutil.cpu_percent(interval=1)
             start_time = time.perf_counter()
             if algorithm == "LLMAStar":
-                path_node_ids, search_history, visited_nodes, checkpoints = await LLMAStar(graph, start_node, end_node, simplified_nodes.copy(), simplified_edges.copy(), nodesKey, removedFromSimplified.copy())
+                path_node_ids, search_history, visited_nodes, checkpoints, invalidCheckpoints = await LLMAStar(graph, start_node, end_node, simplified_nodes.copy(), simplified_edges.copy(), nodesKey, removedFromSimplified.copy())
             else:
                 path_node_ids, search_history, visited_nodes = eval(algorithm)(graph, start_node, end_node)
             end_time = time.perf_counter()
@@ -469,9 +471,11 @@ async def benchmark(algorithm: str = "biDijkstra", endpoints: int = 1, runs: int
                 pathLength += calculate_distance(graph.nodes[path_node_ids[j]]['lat'], graph.nodes[path_node_ids[j]]['lon'], graph.nodes[path_node_ids[j+1]]['lat'], graph.nodes[path_node_ids[j+1]]['lon'])
 
             if (path_node_ids == []):
-                data += f"{i+1}:{time_taken:.5f}:{visited_nodes}:{start_ram}:{end_ram}:{start_cpu}:{end_cpu}:{start_node}:{end_node}:{birdDistance}:{pathLength}:{checkpoints}:NoPath \n "
+                data += f"{i+1}:{time_taken:.5f}:{visited_nodes}:{start_ram}:{end_ram}:{start_cpu}:{end_cpu}:{birdDistance}:{pathLength}:{len(checkpoints)}:{invalidCheckpoints}:NoPath \n "
+            elif (path_node_ids[-1] != end_node):
+                data += f"{i+1}:{time_taken:.5f}:{visited_nodes}:{start_ram}:{end_ram}:{start_cpu}:{end_cpu}:{birdDistance}:{pathLength}:{len(checkpoints)}:{invalidCheckpoints}:InvalidPath \n "
             else:
-                data += f"{i+1}:{time_taken:.5f}:{visited_nodes}:{start_ram}:{end_ram}:{start_cpu}:{end_cpu}:{start_node}:{end_node}:{birdDistance}:{pathLength}:{checkpoints}:PathFound \n "
+                data += f"{i+1}:{time_taken:.5f}:{visited_nodes}:{start_ram}:{end_ram}:{start_cpu}:{end_cpu}:{birdDistance}:{pathLength}:{len(checkpoints)}:{invalidCheckpoints}:PathFound \n "
         print(f"Run {i+1}/{runs} for {algorithm} completed.")
     print(data)
     x = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -494,10 +498,10 @@ async def calculate_route(start_lat: float, start_lon: float, end_lat: float, en
 
     start_time = time.perf_counter()
     checkpoints = []
-
+    invalidCheckpoints = 0
     # Unpack the two returned variables
     if(algorithm == "LLMAStar"):
-        path_node_ids, search_history, visited_nodes, checkpoints = await LLMAStar(graph, start_node, end_node, simplified_nodes.copy(), simplified_edges.copy(), nodesKey, removedFromSimplified.copy())
+        path_node_ids, search_history, visited_nodes, checkpoints, invalidCheckpoints = await LLMAStar(graph, start_node, end_node, simplified_nodes.copy(), simplified_edges.copy(), nodesKey, removedFromSimplified.copy())
     else:
         path_node_ids, search_history, visited_nodes = eval(algorithm)(graph, start_node, end_node)
     
@@ -523,6 +527,7 @@ async def calculate_route(start_lat: float, start_lon: float, end_lat: float, en
             }
         },
         "search_history": search_history, # Send the history to the frontend!
-        "checkpoints": checkpoints
+        "checkpoints": checkpoints,
+        "invalidCheckpoints": invalidCheckpoints
     }
 

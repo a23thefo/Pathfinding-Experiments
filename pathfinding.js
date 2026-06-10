@@ -1,6 +1,6 @@
 function runBenchmark() {
     let algorithm = document.getElementById("algorithm").value;
-    fetch(`http://localhost:8000/benchmark?algorithm=${algorithm}&endpoints=10&runs=10`)
+    fetch(`http://localhost:8000/benchmark?algorithm=${algorithm}&endpoints=10&runs=100`)
         .then(response => response.json())
         .then(data => {
             console.log("Benchmark results:", data);
